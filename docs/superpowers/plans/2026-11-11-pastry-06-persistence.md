@@ -61,7 +61,6 @@ Out, with the feature that owns each: `rememberCount` as a preference
 - [ ] **Step 1: Branch and push the plan**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git checkout master && git pull --ff-only
 git checkout -b feature/06-persistence
 git add docs/superpowers/plans/2026-11-11-pastry-06-persistence.md
@@ -74,7 +73,6 @@ git push -u origin feature/06-persistence
 - [ ] **Step 2: Open the draft pull request**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 gh pr create --repo ralph/Pastry --base master --head feature/06-persistence \
   --draft --title "Feature 6: persistence" --body "$(cat <<'BODY'
 The clipboard history survives quitting.
@@ -203,7 +201,6 @@ struct HistoryStoreTests {
 - [ ] **Step 2: Run them and watch them fail**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|TEST (SUCCEEDED|FAILED)" | head -4
 ```
 
@@ -297,7 +294,6 @@ Expected: `** TEST SUCCEEDED **`, 93 tests.
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/HistoryFile.swift Pastry/HistoryStore.swift PastryTests/HistoryStoreTests.swift
 git commit -m "Add the history file and its store
 
@@ -588,7 +584,6 @@ Expected: `** TEST SUCCEEDED **`, 110 tests. `AppEnvironment` still keeps all of
 - [ ] **Step 3: Verify against the real file — no screen needed**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 rm -rf build/dd
 xcodebuild -project Pastry.xcodeproj -scheme Pastry -configuration Debug -derivedDataPath build/dd build 2>&1 | tail -2
 rm -f ~/Library/Application\ Support/Pastry/history.json

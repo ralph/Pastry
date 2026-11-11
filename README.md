@@ -16,14 +16,28 @@ are skipped.
 **Gives it back two ways.**
 
 Click the scissors in the menu bar for the recent clippings, with a search
-field to filter them. Choosing one pastes it where you were typing.
+field to filter them. Choosing one pastes it where you were typing. The menu
+also holds **Clear All**, **Merge All** — which joins the whole history into
+one clipping — **Settings…**, **About Pastry**, and **Quit Pastry**, which is
+the only way to quit an app with no Dock icon.
 
 Or hold **⇧⌘V** and tap **V** to walk back through the history in a bezel on
 screen; let go of the modifiers and the clipping you stopped on is pasted. The
-bezel also takes ↑ ↓ ← → and `j`/`k` to move, `1`–`9` and `0` to jump straight
-to a position, Home and End for the ends, Page Up and Page Down for ten at a
-time, Return to paste, Delete to remove the clipping shown, Escape to dismiss,
-and ⌘, to open Settings. The combination is yours to change.
+combination is yours to change.
+
+| In the bezel | |
+| --- | --- |
+| ↓ → `j`, or the hotkey's key again | an older clipping |
+| ↑ ← `k` | a newer one |
+| `1`–`9`, `0` | jump to the first ten (`0` is the tenth) |
+| Home / End | the newest / the oldest |
+| Page Up / Page Down | ten at a time |
+| Return | paste the clipping shown |
+| Delete | remove it, and stay open for the next |
+| Escape, or clicking elsewhere | dismiss without pasting |
+| ⌘, | open Settings |
+
+The number keys work from the keypad too, as do Enter and forward delete.
 
 **Keeps the history across launches**, in
 `~/Library/Application Support/Pastry/history.json`, in a directory only you
@@ -38,16 +52,23 @@ but had one sensible answer is now that answer.
 
 ## Settings
 
-Four things, under **Settings…** in the menu or ⌘, in the bezel:
+Under **Settings…** in the menu, or ⌘, in the bezel. Two tabs:
 
-| | |
+| General | |
 | --- | --- |
-| Remember | how many clippings to keep (default 40) |
-| Display in menu | how many to show in the menu (default 30) |
+| Remember | how many clippings to keep — 1 to 99, default 40 |
+| Display in menu | how many to show in the menu — 1 to 99, default 30 |
 | Launch Pastry at login | on by default; read from the system, so changing it in System Settings wins |
-| Summon the bezel | the hotkey, recorded by pressing it |
+
+| Hotkeys | |
+| --- | --- |
+| Summon the bezel | recorded by pressing the combination you want |
 
 Lowering **Remember** discards the oldest clippings straight away.
+
+A hotkey must carry ⌘, ⌃ or ⌥ — ⇧V is a capital V, and such a combination
+would fire whenever you typed that letter. The recorder says so rather than
+accepting it.
 
 ## Permissions
 
@@ -90,10 +111,9 @@ still builds, unsigned, so the workflow can be tried first.
   the pasteboard, `StatusMenu` is the menu, `BezelController` and friends are
   the bezel, `Paster` sends the keystroke, `HistoryStore` and `DebouncedSaver`
   put it on disk.
-- `PastryTests/` — 198 tests.
-- `docs/superpowers/specs/` — the design spec, which records what was decided
-  and, more usefully, what turned out to be wrong.
-- `docs/superpowers/plans/` — one implementation plan per feature.
+- `PastryTests/` — the test suite.
+- `docs/` — the design record: the spec, which says what was decided and,
+  more usefully, what turned out to be wrong, and one plan per feature.
 - `tools/icon/` — the app icon is generated from parametric geometry rather
   than drawn; this builds it.
 

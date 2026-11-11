@@ -72,7 +72,6 @@ Deliberately out, with the feature that owns each:
 - [ ] **Step 1: Branch from an up-to-date master**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git checkout master && git pull --ff-only
 git checkout -b feature/02-clipboard-engine
 ```
@@ -80,7 +79,6 @@ git checkout -b feature/02-clipboard-engine
 - [ ] **Step 2: Commit this plan and push**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add docs/superpowers/plans/2026-11-11-pastry-02-clipboard-engine.md
 git commit -m "Add the implementation plan for feature 2
 
@@ -91,7 +89,6 @@ git push -u origin feature/02-clipboard-engine
 - [ ] **Step 3: Open the draft pull request**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 gh pr create --repo ralph/Pastry --base master --head feature/02-clipboard-engine \
   --draft --title "Feature 2: clipboard engine" --body "$(cat <<'BODY'
 Captures copied text into an in-memory history.
@@ -186,7 +183,6 @@ struct ClipTests {
 - [ ] **Step 2: Run them to make sure they fail**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|TEST (SUCCEEDED|FAILED)" | head -5
 ```
 
@@ -226,7 +222,6 @@ struct Clip: Equatable, Codable, Sendable {
 - [ ] **Step 4: Run the tests and make sure they pass**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|Test run with|TEST (SUCCEEDED|FAILED)" | head -5
 ```
 
@@ -235,7 +230,6 @@ Expected: `** TEST SUCCEEDED **`, 11 tests (4 from feature 1 plus 7 here).
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/Clip.swift PastryTests/ClipTests.swift
 git commit -m "Add the Clip value type
 
@@ -390,7 +384,6 @@ struct ClipStoreTests {
 - [ ] **Step 2: Run them to make sure they fail**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|TEST (SUCCEEDED|FAILED)" | head -5
 ```
 
@@ -463,7 +456,6 @@ final class ClipStore {
 - [ ] **Step 4: Run the tests and make sure they pass**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|✘ Test|Test run with|TEST (SUCCEEDED|FAILED)" | head -8
 ```
 
@@ -474,7 +466,6 @@ Note `rememberCount` is a `var` with a `didSet`, so `init` assigning it does **n
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/ClipStore.swift PastryTests/ClipStoreTests.swift
 git commit -m "Add ClipStore, the clipboard history and its list rules
 
@@ -622,7 +613,6 @@ struct ClipboardMonitorTests {
 - [ ] **Step 2: Run them to make sure they fail**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|TEST (SUCCEEDED|FAILED)" | head -5
 ```
 
@@ -734,7 +724,6 @@ final class ClipboardMonitor {
 - [ ] **Step 5: Run the tests and make sure they pass**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|✘ Test|Test run with|TEST (SUCCEEDED|FAILED)" | head -8
 ```
 
@@ -743,7 +732,6 @@ Expected: `** TEST SUCCEEDED **`, 33 tests.
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/ClipboardSource.swift Pastry/ClipboardMonitor.swift PastryTests/ClipboardMonitorTests.swift
 git commit -m "Add ClipboardMonitor and its pasteboard abstraction
 
@@ -843,7 +831,6 @@ The log line deliberately records the clip's **length and source app, never its 
 - [ ] **Step 3: Run the tests**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|✘ Test|Test run with|TEST (SUCCEEDED|FAILED)" | head -8
 ```
 
@@ -852,7 +839,6 @@ Expected: `** TEST SUCCEEDED **`, 33 tests. The existing `noStatusItemUnderTests
 - [ ] **Step 4: Verify live capture by hand**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 rm -rf build/dd
 xcodebuild -project Pastry.xcodeproj -scheme Pastry -configuration Debug -derivedDataPath build/dd build 2>&1 | tail -2
 open build/dd/Build/Products/Debug/Pastry.app
@@ -869,7 +855,6 @@ Expected: two `captured …` lines, with the history count reaching 2. If no lin
 - [ ] **Step 5: Verify deduplication live**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 printf 'first capture test' | pbcopy
 sleep 1
 log show --info --predicate 'subsystem == "de.rvdh.Pastry"' --last 20s --style compact | tail -3
@@ -881,7 +866,6 @@ Expected: one further `captured` line whose history count is still **2**, not 3 
 - [ ] **Step 6: Commit and push**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/Log.swift Pastry/AppDelegate.swift
 git commit -m "Capture the pasteboard into the clip store
 

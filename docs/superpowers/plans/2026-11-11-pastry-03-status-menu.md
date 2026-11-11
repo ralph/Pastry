@@ -59,7 +59,6 @@ Matching the reference screenshot of the current installation:
 - [ ] **Step 1: Branch from an up-to-date master**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git checkout master && git pull --ff-only
 git checkout -b feature/03-status-menu
 ```
@@ -67,7 +66,6 @@ git checkout -b feature/03-status-menu
 - [ ] **Step 2: Commit this plan and push**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add docs/superpowers/plans/2026-11-11-pastry-03-status-menu.md
 git commit -m "Add the implementation plan for feature 3
 
@@ -78,7 +76,6 @@ git push -u origin feature/03-status-menu
 - [ ] **Step 3: Open the draft pull request**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 gh pr create --repo ralph/Pastry --base master --head feature/03-status-menu \
   --draft --title "Feature 3: status menu" --body "$(cat <<'BODY'
 Lists the captured clips in the menu-bar menu, with Clear All, Merge
@@ -275,7 +272,6 @@ struct StatusMenuTests {
 - [ ] **Step 2: Run them to make sure they fail**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|TEST (SUCCEEDED|FAILED)" | head -5
 ```
 
@@ -384,7 +380,6 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 - [ ] **Step 4: Run the tests and make sure they pass**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|✘ Test|Test run with|TEST (SUCCEEDED|FAILED)" | head -8
 ```
 
@@ -393,7 +388,6 @@ Expected: `** TEST SUCCEEDED **`, 60 tests (48 from feature 2, minus the 1 repla
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/StatusMenu.swift PastryTests/StatusMenuTests.swift
 git commit -m "Build the status menu from the clip store
 
@@ -441,7 +435,6 @@ Order matters in `applicationDidFinishLaunching`: `startMonitoring()` must run *
 - [ ] **Step 2: Run the tests**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|✘ Test|Test run with|TEST (SUCCEEDED|FAILED)" | head -6
 ```
 
@@ -450,7 +443,6 @@ Expected: `** TEST SUCCEEDED **`, 60 tests.
 - [ ] **Step 3: Verify by hand**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 rm -rf build/dd
 xcodebuild -project Pastry.xcodeproj -scheme Pastry -configuration Debug -derivedDataPath build/dd build 2>&1 | tail -2
 open build/dd/Build/Products/Debug/Pastry.app
@@ -470,7 +462,6 @@ pkill -f "Pastry.app/Contents/MacOS/Pastry"
 - [ ] **Step 4: Commit and push**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/AppDelegate.swift
 git commit -m "Show the clip menu on the status item
 

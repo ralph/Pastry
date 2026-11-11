@@ -14,12 +14,18 @@ concurrency:
 
 jobs:
   release:
+    # Pinned to an OS and an Xcode. GitHub retires runner labels, and when
+    # this one goes both workflows fail — this one at tag-push time, which is
+    # the worst moment to find out. Bump both together, here and in ci.yml.
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+        # Pinned to a commit, not a tag: this job holds the signing
+        # certificate and the notary key, so a third-party action that can
+        # move under us is not something to take on trust. v1.7.0.
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4
         with:
           xcode-version: '26'
 
@@ -35,6 +41,14 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Building $version"
 
+      # ci.yml does not run on tags, so without this a tag on a commit with
+      # failing tests would cut a release.
+      - name: Test
+        run: |
+          set -euo pipefail
+          xcodebuild -project Pastry.xcodeproj -scheme Pastry \
+            -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test
+
       # A missing certificate is not a failure: the build still runs, so the
       # workflow can be exercised before the secrets exist.
       - name: Import the signing certificate
@@ -42,6 +56,7 @@ jobs:
         env:
           CERTIFICATE: ${{ secrets.CERTIFICATES_P12 }}
           CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATES_PASSWORD }}
+          TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
         run: |
           set -euo pipefail
           if [ -z "${CERTIFICATE}" ]; then
@@ -49,20 +64,30 @@ jobs:
             echo "::warning::No CERTIFICATES_P12 secret; building unsigned."
             exit 0
           fi
+          # Signing manually without a team fails at codesign rather than
+          # degrading, so treat it the same as having no certificate.
+          if [ -z "${TEAM_ID}" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CERTIFICATES_P12 is set but NOTARY_TEAM_ID is not; building unsigned."
+            exit 0
+          fi
           keychain="$RUNNER_TEMP/build.keychain-db"
           password="$(uuidgen)"
           security create-keychain -p "$password" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$password" "$keychain"
+          # Armed before the file exists, so a failed decode or import cannot
+          # leave the private key sitting in RUNNER_TEMP.
+          trap 'rm -f "$RUNNER_TEMP/cert.p12"' EXIT
           printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
           security import "$RUNNER_TEMP/cert.p12" -k "$keychain" \
             -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          rm -f "$RUNNER_TEMP/cert.p12"
           # Without this, codesign prompts for keychain access and hangs.
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$password" "$keychain" >/dev/null
           security list-keychains -d user -s "$keychain" \
             $(security list-keychains -d user | tr -d '"')
+          echo "keychain=$keychain" >> "$GITHUB_OUTPUT"
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
       - name: Build
@@ -87,17 +112,39 @@ jobs:
           fi
           xcodebuild "${args[@]}" build
 
+      # Five seconds here beats a rejection from Apple ten minutes later.
+      # Notarization needs both the hardened runtime (a project setting) and
+      # a secure timestamp (a flag above); a regression in either is silent
+      # until something checks.
+      - name: Check the signature before submitting it
+        if: steps.signing.outputs.signed == 'true'
+        run: |
+          set -euo pipefail
+          app="build/Build/Products/Release/Pastry.app"
+          codesign --verify --strict --verbose=2 "$app"
+          details="$(codesign --display --verbose=4 "$app" 2>&1)"
+          echo "$details" | grep -E '^(CodeDirectory|Timestamp|Authority)' || true
+          if ! echo "$details" | grep -q 'flags=.*runtime'; then
+            echo "::error::Hardened runtime is not enabled; Apple will reject this."
+            exit 1
+          fi
+          if ! echo "$details" | grep -q '^Timestamp='; then
+            echo "::error::No secure timestamp; Apple will reject this."
+            exit 1
+          fi
+
       - name: Package the DMG
         id: package
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
         run: |
           set -euo pipefail
           app="build/Build/Products/Release/Pastry.app"
           test -d "$app" || { echo "::error::No app at $app"; exit 1; }
           staging="$RUNNER_TEMP/dmg"
           rm -rf "$staging" && mkdir -p "$staging"
-          cp -R "$app" "$staging/"
+          ditto "$app" "$staging/Pastry.app"
           ln -s /Applications "$staging/Applications"
           dmg="Pastry-$VERSION.dmg"
           rm -f "$dmg"
@@ -105,17 +152,23 @@ jobs:
           # but the replacement is new enough that a runner image might not
           # have it — so try the new one and keep the old as the fallback.
           if ! diskutil image create from "$staging" \
-                 --volumeName "Pastry" --format UDZO "$dmg" 2>/dev/null; then
-            echo "::notice::diskutil image create unavailable; using hdiutil."
+                 --volumeName "Pastry" --format UDZO "$dmg"; then
+            echo "::notice::diskutil image create failed; falling back to hdiutil."
             hdiutil create -volname "Pastry" -srcfolder "$staging" \
               -ov -format UDZO "$dmg"
           fi
           test -f "$dmg" || { echo "::error::No DMG was produced"; exit 1; }
+          # The disk image is signed too, not just the app inside it: it is
+          # what gets downloaded, and what spctl is asked about.
+          if [ "$SIGNED" = "true" ]; then
+            codesign --sign "Developer ID Application" --timestamp "$dmg"
+          fi
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
 
       # notarytool takes a DMG directly, so there is one artifact throughout
       # and no second file that could end up stapled differently.
       - name: Notarize and staple
+        id: notarize
         if: steps.signing.outputs.signed == 'true'
         env:
           KEY: ${{ secrets.NOTARY_KEY }}
@@ -124,17 +177,30 @@ jobs:
           DMG: ${{ steps.package.outputs.dmg }}
         run: |
           set -euo pipefail
-          if [ -z "${KEY}" ]; then
-            echo "::warning::Signed but no NOTARY_KEY; skipping notarization."
+          if [ -z "${KEY}" ] || [ -z "${KEY_ID}" ] || [ -z "${ISSUER_ID}" ]; then
+            echo "notarized=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Signed but the notary secrets are incomplete; skipping notarization."
             exit 0
           fi
-          printf '%s' "$KEY" | base64 --decode > "$RUNNER_TEMP/key.p8"
-          trap 'rm -f "$RUNNER_TEMP/key.p8"' EXIT
-          xcrun notarytool submit "$DMG" \
-            --key "$RUNNER_TEMP/key.p8" --key-id "$KEY_ID" \
-            --issuer "$ISSUER_ID" --wait --timeout 30m
+          key="$RUNNER_TEMP/key.p8"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$KEY" | base64 --decode > "$key"
+          # The submission id is captured rather than left in --wait's output,
+          # so the log can be fetched on refusal while the key still exists.
+          id="$(xcrun notarytool submit "$DMG" --key "$key" --key-id "$KEY_ID" \
+                  --issuer "$ISSUER_ID" --output-format json \
+                  | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
+          echo "submission $id"
+          if ! xcrun notarytool wait "$id" --key "$key" --key-id "$KEY_ID" \
+                 --issuer "$ISSUER_ID" --timeout 30m; then
+            echo "::error::Notarization was refused. Apple's reasons follow."
+            xcrun notarytool log "$id" --key "$key" --key-id "$KEY_ID" \
+              --issuer "$ISSUER_ID" || true
+            exit 1
+          fi
           xcrun stapler staple "$DMG"
           xcrun stapler validate "$DMG"
+          echo "notarized=true" >> "$GITHUB_OUTPUT"
 
       - name: Publish a draft release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -143,19 +209,32 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           DMG: ${{ steps.package.outputs.dmg }}
           SIGNED: ${{ steps.signing.outputs.signed }}
+          NOTARIZED: ${{ steps.notarize.outputs.notarized }}
+          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           notes="Pastry $VERSION"
           if [ "$SIGNED" != "true" ]; then
             warning="**Unsigned build** — the signing secrets were not set"
-            warning="$warning when this ran, so macOS will refuse to open it"
-            warning="$warning without a trip through System Settings."
+            warning="$warning when this ran, so macOS will refuse to open it."
+            notes="$notes"$'\n\n'"$warning"
+          elif [ "$NOTARIZED" != "true" ]; then
+            # Signed but not notarized looks finished and is not: Gatekeeper
+            # still blocks it on a machine that has never seen the app.
+            warning="**Signed but not notarized** — the notary secrets were"
+            warning="$warning incomplete, so Gatekeeper will still block this."
             notes="$notes"$'\n\n'"$warning"
           fi
-          gh release create "${GITHUB_REF_NAME}" "$DMG" \
-            --title "Pastry $VERSION" \
-            --notes "$notes" \
-            --draft
+          # Idempotent: re-running after a flake must not fail on a release
+          # the first attempt already created.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists; replacing the asset."
+            gh release upload "$TAG" "$DMG" --clobber
+            gh release edit "$TAG" --notes "$notes"
+          else
+            gh release create "$TAG" "$DMG" \
+              --title "Pastry $VERSION" --notes "$notes" --draft
+          fi
 
       # Also kept as an artifact, so a manual run that publishes nothing
       # still leaves something to look at.
@@ -165,3 +244,9 @@ jobs:
           name: Pastry-dmg
           path: ${{ steps.package.outputs.dmg }}
           if-no-files-found: error
+
+      # Matters on a self-hosted runner, where the keychain and the user's
+      # search list would otherwise outlive the job.
+      - name: Remove the signing keychain
+        if: always() && steps.signing.outputs.keychain != ''
+        run: security delete-keychain "${{ steps.signing.outputs.keychain }}" || true

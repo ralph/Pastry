@@ -74,7 +74,6 @@ back, and there is no completion callback for that.
 - [ ] **Step 1: Branch and push the plan**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git checkout master && git pull --ff-only
 git checkout -b feature/04-paster
 git add docs/superpowers/plans/2026-11-11-pastry-04-paster.md
@@ -87,7 +86,6 @@ git push -u origin feature/04-paster
 - [ ] **Step 2: Open the draft pull request**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 gh pr create --repo ralph/Pastry --base master --head feature/04-paster \
   --draft --title "Feature 4: paste into the frontmost app" --body "$(cat <<'BODY'
 Choosing a clip now pastes it where the user was typing, instead of only
@@ -180,7 +178,6 @@ enum Accessibility {
 - [ ] **Step 3: Confirm it builds**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry build CODE_SIGNING_ALLOWED=NO 2>&1 | grep -E "error:|BUILD" | head -5
 ```
 
@@ -189,7 +186,6 @@ Expected: `** BUILD SUCCEEDED **`.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/Keystroke.swift Pastry/Accessibility.swift
 git commit -m "Add the paste keystroke and the Accessibility check
 
@@ -332,7 +328,6 @@ struct PasterTests {
 - [ ] **Step 2: Run them to make sure they fail**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|TEST (SUCCEEDED|FAILED)" | head -5
 ```
 
@@ -411,7 +406,6 @@ final class Paster {
 - [ ] **Step 4: Run the tests and make sure they pass**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|✘ Test|Test run with|TEST (SUCCEEDED|FAILED)" | head -8
 ```
 
@@ -420,7 +414,6 @@ Expected: `** TEST SUCCEEDED **`, 70 tests (63 plus 7 here).
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/Paster.swift PastryTests/PasterTests.swift
 git commit -m "Add Paster, which puts a clip where the user is typing
 
@@ -467,7 +460,6 @@ and `choose(_:)` becomes:
 - [ ] **Step 2: Run the tests**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|✘ Test|Test run with|TEST (SUCCEEDED|FAILED)" | head -6
 ```
 
@@ -481,7 +473,6 @@ keystroke. The first run will show the Accessibility prompt; grant it in System
 Settings, then try again.
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 rm -rf build/dd
 xcodebuild -project Pastry.xcodeproj -scheme Pastry -configuration Debug -derivedDataPath build/dd build 2>&1 | tail -2
 open build/dd/Build/Products/Debug/Pastry.app
@@ -498,7 +489,6 @@ tccutil reset Accessibility de.rvdh.Pastry
 - [ ] **Step 4: Commit and push**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/AppDelegate.swift
 git commit -m "Paste a chosen clip into the frontmost application
 
