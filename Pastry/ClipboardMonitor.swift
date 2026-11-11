@@ -20,6 +20,8 @@ final class ClipboardMonitor {
     private let interval: Duration
     private let onCapture: (Clip) -> Void
     private var lastChangeCount: Int
+    /// A change whose text could not be read yet, awaiting one more attempt.
+    private var retryingChangeCount: Int?
     private var pollTask: Task<Void, Never>?
 
     init(
@@ -51,10 +53,14 @@ final class ClipboardMonitor {
                 } catch {
                     return
                 }
+                // A sleep that finished before stop() was called cannot be
+                // made to throw retroactively, so check again here: otherwise
+                // one poll still runs after stop() returned.
+                if Task.isCancelled { return }
                 // Dropped without stop() being called: end the loop rather
                 // than poll a monitor nobody owns any more.
                 guard let self else { return }
-                self.poll()
+                await self.poll()
             }
         }
     }
@@ -73,13 +79,35 @@ final class ClipboardMonitor {
         lastChangeCount = source.write(text)
     }
 
-    func poll() {
+    func poll() async {
         let changeCount = source.changeCount
         guard changeCount != lastChangeCount else { return }
-        lastChangeCount = changeCount
 
-        guard !source.hasType(Self.concealedType) else { return }
-        guard let text = source.string(), !text.isEmpty else { return }
+        if source.hasType(Self.concealedType) {
+            lastChangeCount = changeCount
+            retryingChangeCount = nil
+            return
+        }
+
+        guard let text = await source.string() else {
+            // A writer bumps the change count with clearContents() before it
+            // supplies the data, so a poll landing in that gap sees no text.
+            // Give it one more cycle before writing the change off, rather
+            // than losing the clip permanently — but only one, so a clip that
+            // genuinely holds no text is not re-read on every poll for as
+            // long as it sits on the pasteboard.
+            if retryingChangeCount == changeCount {
+                lastChangeCount = changeCount
+                retryingChangeCount = nil
+            } else {
+                retryingChangeCount = changeCount
+            }
+            return
+        }
+
+        lastChangeCount = changeCount
+        retryingChangeCount = nil
+        guard !text.isEmpty else { return }
 
         onCapture(Clip(text: text, source: frontmostApp(), date: now()))
     }

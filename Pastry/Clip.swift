@@ -44,7 +44,6 @@ struct Clip: Equatable, Codable, Sendable {
     var displayText: String {
         var collapsed = ""
         collapsed.reserveCapacity(Self.displayLength + 1)
-        var length = 0
         var pendingSpace = false
 
         for character in text {
@@ -56,15 +55,17 @@ struct Clip: Equatable, Codable, Sendable {
             }
             if pendingSpace {
                 collapsed.append(" ")
-                length += 1
                 pendingSpace = false
             }
             collapsed.append(character)
-            length += 1
-            if length > Self.displayLength { break }
+            // Counted on the string itself, never on an append tally: a
+            // combining mark can join the character before it, so appends and
+            // grapheme clusters are not one to one. The string is capped just
+            // past the display length, so this stays cheap.
+            if collapsed.count > Self.displayLength { break }
         }
 
-        guard length > Self.displayLength else { return collapsed }
+        guard collapsed.count > Self.displayLength else { return collapsed }
         return String(collapsed.prefix(Self.displayLength - 1)) + "…"
     }
 }

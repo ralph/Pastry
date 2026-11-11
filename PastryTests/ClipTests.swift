@@ -50,6 +50,17 @@ struct ClipTests {
         #expect(display.hasPrefix("x x x"))
     }
 
+    /// A combining mark that lands straight after an inserted space joins it
+    /// into one grapheme, so counting appends rather than the string itself
+    /// over-counted and truncated text that actually fitted.
+    @Test("does not truncate text that fits once combining marks are joined")
+    func combiningMarkAfterCollapsedSpace() {
+        let text = "a\n\u{0301}" + String(repeating: "b", count: 38)
+        let display = Clip.fixture(text).displayText
+        #expect(display.count == Clip.displayLength)
+        #expect(!display.hasSuffix("…"))
+    }
+
     @Test("renders whitespace-only text as empty")
     func whitespaceOnly() {
         #expect(Clip.fixture(" \n\t ").displayText.isEmpty)

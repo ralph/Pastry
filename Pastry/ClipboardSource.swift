@@ -14,7 +14,15 @@ import AppKit
 protocol ClipboardSource {
     var changeCount: Int { get }
     func hasType(_ type: String) -> Bool
-    func string() -> String?
+
+    /// Reads the pasteboard's plain text, off the main actor.
+    ///
+    /// The owning application supplies the data when it is asked for, and it
+    /// may be slow to do so — a large copy from Remote Desktop, or a clip
+    /// arriving from an iPhone over Universal Clipboard, can take seconds.
+    /// Reading that on the main actor would freeze the menu bar for the
+    /// duration, so the read happens elsewhere and only the result comes back.
+    func string() async -> String?
 
     /// Replaces the pasteboard contents, returning the resulting change count.
     @discardableResult
@@ -30,7 +38,11 @@ struct SystemClipboard: ClipboardSource {
         NSPasteboard.general.availableType(from: [.init(type)]) != nil
     }
 
-    func string() -> String? { NSPasteboard.general.string(forType: .string) }
+    func string() async -> String? {
+        await Task.detached(priority: .userInitiated) {
+            NSPasteboard.general.string(forType: .string)
+        }.value
+    }
 
     @discardableResult
     func write(_ text: String) -> Int {
