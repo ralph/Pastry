@@ -69,11 +69,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// never sees a keystroke. The only way through is to cancel the menu,
     /// activate, and put it back up — which is what Flycut does.
     ///
-    /// Deliberately does **not** consult `NSApp.isActive`. For this app it
-    /// stays false even after activation and a second of waiting, so using it
-    /// to decide anything either spins — cancel, activate, never look active,
-    /// cancel again — or abandons the reopen and leaves the click dead. The
-    /// latch below is the only thing that distinguishes the two openings.
+    /// Deliberately consults no "are we active yet" signal, because none of
+    /// them report the activation. Measured at the moment the reopen fires and
+    /// the search field goes on to work: `NSApp.isActive` is false and
+    /// `NSWorkspace.frontmostApplication` is still the other application.
+    /// Guarding on either therefore breaks the normal case — `isActive` was
+    /// tried twice, once spinning at 50% CPU and once leaving the click dead.
+    /// The latch below is the only thing that distinguishes the two openings.
+    ///
+    /// The cost of having no signal: switching applications during the delay
+    /// still reopens the menu, over whatever is frontmost by then. Rare, and
+    /// recoverable by pressing Escape.
     private func menuWillOpen() {
         if isReopeningMenu {
             // This is the reopen we asked for; the field can take focus now.

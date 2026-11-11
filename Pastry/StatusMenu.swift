@@ -68,7 +68,16 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSSearchFieldDelegate {
     /// nothing in it can be first responder.
     func focusSearchField() {
         guard let window = searchField.window else { return }
-        responderBeforeSearch = window.firstResponder
+
+        // Never remember the field, or the field editor it is already using,
+        // as the way back out: the arrow keys would then restore the very
+        // responder they are trying to leave and navigation would be dead.
+        // Reachable by clicking into the field before this callback runs.
+        let current = window.firstResponder
+        if current !== searchField, current !== searchField.currentEditor() {
+            responderBeforeSearch = current
+        }
+
         window.makeFirstResponder(searchField)
     }
 
@@ -96,7 +105,10 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSSearchFieldDelegate {
     ) -> Bool {
         switch commandSelector {
         case #selector(NSResponder.moveDown(_:)), #selector(NSResponder.moveUp(_:)):
+            // nil resigns first responder, which leaves the menu free to take
+            // the key — the right fallback when there was nothing to remember.
             searchField.window?.makeFirstResponder(responderBeforeSearch)
+            responderBeforeSearch = nil
             return true
         default:
             return false
