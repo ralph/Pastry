@@ -84,6 +84,16 @@ jobs:
           # leave the private key sitting in RUNNER_TEMP.
           trap 'rm -f "$RUNNER_TEMP/cert.p12"' EXIT
           printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          # Checked before importing, because security's own complaint for a
+          # malformed secret is "Unknown format in import", which sounds like
+          # the certificate is wrong when the usual cause is a truncated
+          # paste. This separates a damaged secret from a wrong password.
+          if ! openssl asn1parse -inform DER -in "$RUNNER_TEMP/cert.p12" >/dev/null 2>&1; then
+            echo "::error::CERTIFICATES_P12 did not decode to a valid PKCS#12."
+            echo "::error::It is usually a truncated paste. Set it from the file instead:"
+            echo "::error::  base64 -i YourCert.p12 | gh secret set CERTIFICATES_P12 --repo ralph/Pastry"
+            exit 1
+          fi
           security import "$RUNNER_TEMP/cert.p12" -k "$keychain" \
             -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           # Without this, codesign prompts for keychain access and hangs.
