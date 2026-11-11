@@ -1,6 +1,6 @@
 import AppKit
 
-/// Owns the menu-bar status item.
+/// Owns the menu-bar status item and the clipboard capture pipeline.
 ///
 /// The status item is AppKit rather than SwiftUI's `MenuBarExtra` by choice: a
 /// search field inside a menu needs a custom-view `NSMenuItem`, which
@@ -9,10 +9,13 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var statusItem: NSStatusItem?
+    private(set) var store = ClipStore()
+    private(set) var monitor: ClipboardMonitor?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppEnvironment.isRunningTests else { return }
         installStatusItem()
+        startMonitoring()
     }
 
     private func installStatusItem() {
@@ -27,5 +30,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         item.menu = StatusMenu.make()
         statusItem = item
+    }
+
+    private func startMonitoring() {
+        let monitor = ClipboardMonitor(source: SystemClipboard()) { [weak self] text in
+            self?.capture(text)
+        }
+        monitor.start()
+        self.monitor = monitor
+    }
+
+    private func capture(_ text: String) {
+        let app = NSWorkspace.shared.frontmostApplication
+        store.add(
+            Clip(
+                text: text,
+                appName: app?.localizedName,
+                appBundleURL: app?.bundleURL,
+                date: Date()
+            )
+        )
+        // Length and source app only. Clip text is the user's clipboard and
+        // never goes to the unified log, which other processes can read.
+        Log.clipboard.info(
+            "captured \(text.count) characters from \(app?.localizedName ?? "an unknown app", privacy: .public); history now \(self.store.count)"
+        )
     }
 }

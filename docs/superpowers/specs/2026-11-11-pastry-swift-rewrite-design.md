@@ -138,9 +138,12 @@ favorites bookkeeping; SwiftUI and the menu observe it directly.
 
 ### 5.3 `ClipboardMonitor`
 
-Polls `NSPasteboard.general.changeCount` every 0.5 s. The timer is scheduled in
-`.common` run-loop mode so polling continues while the status menu is open —
-without this, a clipping arriving while the menu is open is missed.
+Polls `NSPasteboard.general.changeCount` every 0.5 s from a `Task` loop rather
+than an `NSTimer`. Main-actor work drains on the main queue, which keeps running
+while a menu is tracking, so a clipping that arrives with the status menu open is
+still seen — the case `.common` run-loop modes existed to solve for the timer.
+The task also ends itself if the monitor is released without `stop()`, which a
+nonisolated `deinit` cannot do for a non-Sendable `Timer` under Swift 6.
 
 Skips a change when:
 - the pasteboard carries `org.nspasteboard.ConcealedType` (the marker password

@@ -40,7 +40,7 @@ Deliberately out, with the feature that owns each:
 | Empty text | never stored |
 | Concealed clip | `org.nspasteboard.ConcealedType` on the pasteboard means the change is consumed but nothing is recorded |
 | Pastry's own writes | suppressed, so pasting does not re-record the clip |
-| Poll interval | 0.5 s, on `.common` run loop modes so it keeps polling while a menu is open |
+| Poll interval | 0.5 s, from a `Task` loop so it keeps polling while a menu is open |
 
 ---
 
@@ -900,3 +900,19 @@ git push
 - [ ] No Objective-C file modified or deleted.
 
 Then: `/simplify`, mark ready for review, `/code-review medium`, a Codex review, squash merge.
+
+
+---
+
+## Deviations from this plan during execution
+
+- `ClipboardMonitor` polls from a `Task` loop, not an `NSTimer`. Swift 6 refuses
+  to let a nonisolated `deinit` invalidate a non-Sendable `Timer`, and passing
+  the timer into a main-actor closure to self-invalidate is a data race. The
+  task loop solves the menu-tracking case the `.common` run loop mode existed
+  for, and ends itself when the monitor is released. `interval` is a `Duration`
+  rather than a `TimeInterval`.
+- Live verification found the first `pbcopy` missed when it raced the app's
+  launch: the monitor takes its baseline `changeCount` at construction, so a
+  copy made before the app finishes launching is correctly treated as
+  pre-existing. Verification was repeated against an already-running app.
