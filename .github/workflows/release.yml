@@ -1,0 +1,167 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26'
+
+      # The tag is the version, so the tag and the bundle cannot disagree.
+      - name: Work out the version
+        id: version
+        run: |
+          set -euo pipefail
+          case "${GITHUB_REF_NAME}" in
+            v*) version="${GITHUB_REF_NAME#v}" ;;
+            *)  version="0.0.0" ;;   # a manual run from a branch
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building $version"
+
+      # A missing certificate is not a failure: the build still runs, so the
+      # workflow can be exercised before the secrets exist.
+      - name: Import the signing certificate
+        id: signing
+        env:
+          CERTIFICATE: ${{ secrets.CERTIFICATES_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATES_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CERTIFICATE}" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No CERTIFICATES_P12 secret; building unsigned."
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/build.keychain-db"
+          password="$(uuidgen)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" \
+            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          # Without this, codesign prompts for keychain access and hangs.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" \
+            $(security list-keychains -d user | tr -d '"')
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        env:
+          TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          VERSION: ${{ steps.version.outputs.version }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
+        run: |
+          set -euo pipefail
+          args=(-project Pastry.xcodeproj -scheme Pastry -configuration Release
+                -destination 'generic/platform=macOS'
+                -derivedDataPath build
+                MARKETING_VERSION="$VERSION"
+                CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}")
+          if [ "$SIGNED" = "true" ]; then
+            args+=(CODE_SIGN_IDENTITY="Developer ID Application"
+                   CODE_SIGN_STYLE=Manual
+                   DEVELOPMENT_TEAM="$TEAM_ID"
+                   OTHER_CODE_SIGN_FLAGS=--timestamp)
+          else
+            args+=(CODE_SIGNING_ALLOWED=NO)
+          fi
+          xcodebuild "${args[@]}" build
+
+      - name: Package the DMG
+        id: package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          app="build/Build/Products/Release/Pastry.app"
+          test -d "$app" || { echo "::error::No app at $app"; exit 1; }
+          staging="$RUNNER_TEMP/dmg"
+          rm -rf "$staging" && mkdir -p "$staging"
+          cp -R "$app" "$staging/"
+          ln -s /Applications "$staging/Applications"
+          dmg="Pastry-$VERSION.dmg"
+          rm -f "$dmg"
+          # hdiutil create is deprecated as of macOS 26 in favour of this,
+          # but the replacement is new enough that a runner image might not
+          # have it — so try the new one and keep the old as the fallback.
+          if ! diskutil image create from "$staging" \
+                 --volumeName "Pastry" --format UDZO "$dmg" 2>/dev/null; then
+            echo "::notice::diskutil image create unavailable; using hdiutil."
+            hdiutil create -volname "Pastry" -srcfolder "$staging" \
+              -ov -format UDZO "$dmg"
+          fi
+          test -f "$dmg" || { echo "::error::No DMG was produced"; exit 1; }
+          echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
+
+      # notarytool takes a DMG directly, so there is one artifact throughout
+      # and no second file that could end up stapled differently.
+      - name: Notarize and staple
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          KEY: ${{ secrets.NOTARY_KEY }}
+          KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          DMG: ${{ steps.package.outputs.dmg }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEY}" ]; then
+            echo "::warning::Signed but no NOTARY_KEY; skipping notarization."
+            exit 0
+          fi
+          printf '%s' "$KEY" | base64 --decode > "$RUNNER_TEMP/key.p8"
+          trap 'rm -f "$RUNNER_TEMP/key.p8"' EXIT
+          xcrun notarytool submit "$DMG" \
+            --key "$RUNNER_TEMP/key.p8" --key-id "$KEY_ID" \
+            --issuer "$ISSUER_ID" --wait --timeout 30m
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+
+      - name: Publish a draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          DMG: ${{ steps.package.outputs.dmg }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
+        run: |
+          set -euo pipefail
+          notes="Pastry $VERSION"
+          if [ "$SIGNED" != "true" ]; then
+            warning="**Unsigned build** — the signing secrets were not set"
+            warning="$warning when this ran, so macOS will refuse to open it"
+            warning="$warning without a trip through System Settings."
+            notes="$notes"$'\n\n'"$warning"
+          fi
+          gh release create "${GITHUB_REF_NAME}" "$DMG" \
+            --title "Pastry $VERSION" \
+            --notes "$notes" \
+            --draft
+
+      # Also kept as an artifact, so a manual run that publishes nothing
+      # still leaves something to look at.
+      - name: Keep the DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pastry-dmg
+          path: ${{ steps.package.outputs.dmg }}
+          if-no-files-found: error
