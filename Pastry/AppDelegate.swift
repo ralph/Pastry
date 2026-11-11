@@ -9,13 +9,15 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var statusItem: NSStatusItem?
+    private(set) var statusMenu: StatusMenu?
     private(set) var store = ClipStore()
     private(set) var monitor: ClipboardMonitor?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppEnvironment.isRunningTests else { return }
-        installStatusItem()
+        // The monitor first: choosing a menu row writes through it.
         startMonitoring()
+        installStatusItem()
     }
 
     private func installStatusItem() {
@@ -28,7 +30,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // no way left to quit it, so fall back to something visible.
             item.button?.title = "Pastry"
         }
-        item.menu = StatusMenu.make()
+        let statusMenu = StatusMenu(store: store) { [weak self] clip in
+            self?.choose(clip)
+        }
+        item.menu = statusMenu.menu
+        self.statusMenu = statusMenu
         statusItem = item
     }
 
@@ -38,6 +44,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         monitor.start()
         self.monitor = monitor
+    }
+
+    /// Puts a chosen clip on the pasteboard. Feature 4 adds the keystroke that
+    /// pastes it into the frontmost application.
+    private func choose(_ clip: Clip) {
+        monitor?.write(clip.text)
+        Log.clipboard.info("copied a clip of \(clip.text.utf8.count) bytes back to the pasteboard")
     }
 
     private func record(_ clip: Clip) {

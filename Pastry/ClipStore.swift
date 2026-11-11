@@ -49,6 +49,17 @@ final class ClipStore {
         clips.remove(at: index)
     }
 
+    /// Moves an existing clip to the top, keeping its source app and date.
+    ///
+    /// Choosing a clip is not copying it afresh: the bezel shows when the text
+    /// was first copied, so re-adding it through `add(_:)` — which stamps the
+    /// current date — would be wrong.
+    func moveToTop(at index: Int) {
+        guard let clip = clip(at: index) else { return }
+        clips.remove(at: index)
+        clips.insert(clip, at: 0)
+    }
+
     func clear() {
         clips.removeAll()
     }
