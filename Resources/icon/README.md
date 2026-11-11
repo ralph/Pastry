@@ -3,15 +3,25 @@
 Vector sources for the Pastry app bundle icon. This is **not** the menu-bar
 glyph (that is a flat monochrome SF Symbol template, a separate asset).
 
-Status: **four concepts, awaiting a decision.** Once one is chosen, the real
-`.icon` bundle is produced from the same geometry.
+Status: **three compositions, awaiting a decision.** Once one is chosen, the
+real `.icon` bundle is produced from the same geometry.
+
+## The design
+
+A simplified side view of a layer-cake slice, taken from a reference photo of a
+pineapple-coconut slice: thick frosting cap, sponge, cream with fruit through
+it, sponge, and a cherry on top. Beside it, a pair of scissors seen from the
+side at an angle — drawn in the spirit of the scissors emoji (wide blades,
+two handle loops), but original geometry, not a trace of it.
+
+Direction: light ground, colourful garnish, dark scissors for contrast.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `concepts.py` | The geometry. Emits every concept's layers as SVG path data on stdout as JSON. Single source of truth for the shapes. |
-| `contact_sheet.py` | Builds `sheet.svg` from that JSON: each concept at 320 / 128 / 64 / 32 / 16 pt, in both appearances. |
+| `concepts.py` | The geometry. Emits every composition's layers as SVG path data on stdout as JSON. Single source of truth for the shapes. |
+| `contact_sheet.py` | Builds `sheet.svg` from that JSON: each composition at 320 / 128 / 64 / 32 / 16 pt, in both appearances. |
 | `concepts.png` | The rendered contact sheet, checked in so the concepts are reviewable without running anything. |
 
 ## Regenerating
@@ -27,13 +37,19 @@ Only `rsvg-convert` (librsvg) is external; everything else is stdlib Python 3.
 Any SVG rasteriser works — `magick`, `qlmanage -t`, or opening `sheet.svg` in a
 browser.
 
-## Why the shapes are generated rather than hand-drawn
+## How the shapes are built
 
-The marks are built from a few parametric primitives — `tapered_arc` for the
-croissant crescents, `round_poly` for chamfered slices, `blade`/`ring` for the
-scissors. Keeping them as parameters means a shape can be re-proportioned
-(thicker crescent, wider cut gap, different taper) by changing a number instead
-of re-drawing Bézier handles, and the output stays exactly reproducible.
+Parametric primitives rather than hand-drawn Béziers, so a shape can be
+re-proportioned by changing a number instead of dragging control points:
+
+- `cake(x0, x1, ytop, ybot)` — the slice. Band thicknesses are fractions of the
+  total height, so the whole slice rescales as one.
+- `scissors(pivot, deg, blade_len, arm_len, loop_r, spread)` — built along a
+  local +x axis running pivot → handles, blades along −x, then rotated into
+  place by `xform`. Change `deg` to re-angle the whole tool.
+- `blade_shape` — one blade: wide at the pivot, straight inner cutting edge,
+  rounded point. Deliberately chunky; thin blades disappear below 64 pt.
+- `round_poly`, `taper`, `ring`, `circle` — the primitives those are made of.
 
 Coordinates are emitted on the **1024×1024** canvas Icon Composer expects, so
 the generated paths drop straight into layer SVGs unmodified.
@@ -60,19 +76,27 @@ bundles on this machine (Xcode 27.2):
 
 ## Palette
 
-One foreground palette is shared across appearances; only the background
-gradient changes for Dark. That keeps the mark identical in every appearance
-(which the HIG asks for) and keeps `icon.json` to a single `dark`
-specialization on the background.
+**Only the scissors change between appearances.** Everything edible keeps one
+palette in both, which is what the HIG asks for (keep the icon's features
+consistent across appearances) and keeps `icon.json` down to a single `dark`
+specialization on the scissors plus one on the background.
 
-| Role | Value |
-|---|---|
-| Background, default | `#FFD688` → `#E8832B` |
-| Background, dark | `#6E4320` → `#23130A` |
-| Pastry (light cream) | `#FFF6E4` |
-| Pastry (shadowed cream) | `#FBE4BC` |
-| Cream filling | `#FFCF86` |
-| Blade / steel | `#FFFFFF`, `#E2ECF7` |
+| Role | Default | Dark |
+|---|---|---|
+| Frosting | `#FFFFFF` | same |
+| Sponge | `#F9D89B` | same |
+| Cream | `#FFF6E6` | same |
+| Pineapple | `#FFC42B` | same |
+| Cherry | `#E8384C` | same |
+| Stem | `#4E7F3C` | same |
+| Scissors | `#332E3B` | `#A7AFC4` |
+
+The dark-appearance scissors are deliberately mid-slate rather than near-white:
+they have to read against the dark ground *and* against the white frosting they
+cross. Near-white blades vanish on the frosting.
+
+Grounds are gradients declared in `icon.json`, not artwork. Four are drawn up
+(`COLORWAYS` in `concepts.py`): rose, vanilla, mint, sky.
 
 ## Note on location
 

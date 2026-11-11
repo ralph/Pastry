@@ -1,4 +1,4 @@
-import json, subprocess, sys
+import json, html
 d = json.load(open('geom.json'))
 SIZES = [320, 128, 64, 32, 16]
 PAD, GAP, ROWH = 20, 26, 352
@@ -25,7 +25,7 @@ for ci, c in enumerate(d['concepts']):
         body.append(f'<rect x="0" y="{ry-8}" width="{W}" height="{ROWH-6}" '
                     f'fill="{"#c9c9c9" if mi==0 else "#4a4a4a"}"/>')
         body.append(f'<text x="{PAD}" y="{ry+340}" font-family="Helvetica" font-size="15" '
-                    f'fill="{"#111" if mi==0 else "#eee"}">{c["title"]} — {mode}</text>')
+                    f'fill="{"#111" if mi==0 else "#eee"}">{html.escape(c["title"])} — {mode}</text>')
         x = PAD
         for s in SIZES:
             n += 1

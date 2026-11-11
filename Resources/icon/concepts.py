@@ -1,76 +1,17 @@
-"""Geometry for Pastry app-icon concepts. Canvas 1024x1024, y-down.
-Angles: degrees, 0=+x(right), 90=down, 180=left, 270=up."""
+"""Pastry app icon, round 2: a simplified layered cake slice (side view)
+with Apple-emoji-style scissors seen from the side, at an angle.
+Canvas 1024x1024, y-down. Light backgrounds, colourful accents, dark scissors."""
 import json, math
 
 C = 1024.0
-MID = C / 2.0
 
 def P(x, y):
     return f"{x:.1f} {y:.1f}".replace(".0", "")
 
-def poly(pts, close=True):
-    d = "M " + P(*pts[0]) + " " + " ".join("L " + P(*p) for p in pts[1:])
-    return d + " Z" if close else d
-
-def rr(x, y, w, h, r):
-    """Rounded rect as a path."""
-    r = min(r, w / 2, h / 2)
-    return (f"M {x+r:.0f} {y:.0f} H {x+w-r:.0f} A {r:.1f} {r:.1f} 0 0 1 {x+w:.0f} {y+r:.0f} "
-            f"V {y+h-r:.0f} A {r:.1f} {r:.1f} 0 0 1 {x+w-r:.0f} {y+h:.0f} "
-            f"H {x+r:.0f} A {r:.1f} {r:.1f} 0 0 1 {x:.0f} {y+h-r:.0f} "
-            f"V {y+r:.0f} A {r:.1f} {r:.1f} 0 0 1 {x+r:.0f} {y:.0f} Z")
-
-def tapered_arc(cx, cy, r_mid, half_c, half_e, a0, a1, steps=44, bulge=0.0):
-    """Crescent/croissant: arc swept a0->a1 whose half-thickness eases from
-    half_e at the ends to half_c at the middle. Returns a closed path."""
-    outer, inner = [], []
-    for i in range(steps + 1):
-        t = i / steps
-        a = math.radians(a0 + (a1 - a0) * t)
-        # smooth bell: 1 at centre, 0 at both ends
-        bell = math.sin(math.pi * t) ** 0.72
-        ht = half_e + (half_c - half_e) * bell
-        rm = r_mid + bulge * bell
-        ca, sa = math.cos(a), math.sin(a)
-        outer.append((cx + (rm + ht) * ca, cy + (rm + ht) * sa))
-        inner.append((cx + (rm - ht) * ca, cy + (rm - ht) * sa))
-    return poly(outer + list(reversed(inner)))
-
-def blade(pivot, tip, w_pivot, w_tip, curve=0.0):
-    """Tapered scissor blade from pivot to tip, optionally bowed."""
-    px, py = pivot; tx, ty = tip
-    dx, dy = tx - px, ty - py
-    L = math.hypot(dx, dy)
-    ux, uy = dx / L, dy / L
-    nx, ny = -uy, ux                      # left normal
-    mx, my = (px + tx) / 2 + nx * curve, (py + ty) / 2 + ny * curve
-    wm = (w_pivot + w_tip) / 2 * 1.06
-    a = (px + nx * w_pivot, py + ny * w_pivot)
-    b = (mx + nx * wm, my + ny * wm)
-    c = (tx + nx * w_tip, ty + ny * w_tip)
-    d = (tx - nx * w_tip, ty - ny * w_tip)
-    e = (mx - nx * wm, my - ny * wm)
-    f = (px - nx * w_pivot, py - ny * w_pivot)
-    return (f"M {P(*a)} Q {P(*b)} {P(*c)} "
-            f"A {w_tip:.1f} {w_tip:.1f} 0 0 1 {P(*d)} "
-            f"Q {P(*e)} {P(*f)} Z")
-
-def ring(cx, cy, r_out, thick, squash=1.0, rot=0.0):
-    """Annulus (handle ring) as one even-odd path; optional ellipse squash."""
-    ro_x, ro_y = r_out, r_out * squash
-    ri_x, ri_y = r_out - thick, (r_out - thick) * squash
-    def ell(rx, ry, sweep):
-        return (f"M {cx-rx:.1f} {cy:.1f} "
-                f"A {rx:.1f} {ry:.1f} {rot} 0 {sweep} {cx+rx:.1f} {cy:.1f} "
-                f"A {rx:.1f} {ry:.1f} {rot} 0 {sweep} {cx-rx:.1f} {cy:.1f} Z")
-    return ell(ro_x, ro_y, 1) + " " + ell(ri_x, ri_y, 0)
-
-def arm(p0, p1, w0, w1):
-    return blade(p0, p1, w0, w1)
-
+def poly(pts):
+    return "M " + P(*pts[0]) + " " + " ".join("L " + P(*p) for p in pts[1:]) + " Z"
 
 def round_poly(pts, radii):
-    """Polygon with per-vertex rounded corners. pts in path order."""
     n = len(pts)
     if isinstance(radii, (int, float)):
         radii = [radii] * n
@@ -85,143 +26,193 @@ def round_poly(pts, radii):
         if theta < 1e-6 or abs(theta - math.pi) < 1e-6:
             corners.append((v, v, 0.0, 1)); continue
         t = min(radii[i] / math.tan(theta/2), l1/2, l2/2)
-        r_eff = t * math.tan(theta/2)
         cross = u1[0]*u2[1] - u1[1]*u2[0]
         corners.append(((v[0]+u1[0]*t, v[1]+u1[1]*t),
-                        (v[0]+u2[0]*t, v[1]+u2[1]*t), r_eff, 1 if cross < 0 else 0))
+                        (v[0]+u2[0]*t, v[1]+u2[1]*t),
+                        t * math.tan(theta/2), 1 if cross < 0 else 0))
     d = "M " + P(*corners[0][0])
     for a, b, r, sw in corners:
         d += " L " + P(*a)
         d += (f" A {r:.1f} {r:.1f} 0 0 {sw} {P(*b)}" if r > 0.01 else " L " + P(*b))
     return d + " Z"
 
-def shift(d, dx, dy):
-    """Translate every coordinate pair in a generated path (paths here use
-    absolute 'x y' pairs after M/L and after the A flag triplet)."""
-    out, i, toks = [], 0, d.split()
-    while i < len(toks):
-        t = toks[i]
-        if t in ("M", "L"):
-            out.append(t); out.append(f"{float(toks[i+1])+dx:.2f}"); out.append(f"{float(toks[i+2])+dy:.2f}"); i += 3
-        elif t == "Q":
-            out.append(t)
-            for k in range(4):
-                out.append(f"{float(toks[i+1+k])+(dx if k % 2 == 0 else dy):.2f}")
-            i += 5
-        elif t == "A":
-            out += [t, toks[i+1], toks[i+2], toks[i+3], toks[i+4], toks[i+5]]
-            out.append(f"{float(toks[i+6])+dx:.2f}"); out.append(f"{float(toks[i+7])+dy:.2f}"); i += 8
-        elif t in ("H",):
-            out.append(t); out.append(f"{float(toks[i+1])+dx:.2f}"); i += 2
-        elif t in ("V",):
-            out.append(t); out.append(f"{float(toks[i+1])+dy:.2f}"); i += 2
+def circle(cx, cy, r):
+    return (f"M {P(cx-r, cy)} A {r:.1f} {r:.1f} 0 0 1 {P(cx+r, cy)} "
+            f"A {r:.1f} {r:.1f} 0 0 1 {P(cx-r, cy)} Z")
+
+def ring(cx, cy, r_out, thick):
+    ri = r_out - thick
+    return (f"M {P(cx-r_out, cy)} A {r_out:.1f} {r_out:.1f} 0 0 1 {P(cx+r_out, cy)} "
+            f"A {r_out:.1f} {r_out:.1f} 0 0 1 {P(cx-r_out, cy)} Z "
+            f"M {P(cx-ri, cy)} A {ri:.1f} {ri:.1f} 0 0 0 {P(cx+ri, cy)} "
+            f"A {ri:.1f} {ri:.1f} 0 0 0 {P(cx-ri, cy)} Z")
+
+def taper(p0, p1, w0, w1, curve=0.0):
+    """Tapered limb from p0 (width w0) to p1 (width w1), rounded tip."""
+    ax, ay = p0; bx, by = p1
+    dx, dy = bx-ax, by-ay
+    L = math.hypot(dx, dy) or 1e-9
+    ux, uy = dx/L, dy/L
+    nx, ny = -uy, ux
+    mx, my = (ax+bx)/2 + nx*curve, (ay+by)/2 + ny*curve
+    wm = (w0 + w1) / 2 * 1.04
+    A = (ax + nx*w0, ay + ny*w0); B = (mx + nx*wm, my + ny*wm); D = (bx + nx*w1, by + ny*w1)
+    E = (bx - nx*w1, by - ny*w1); F = (mx - nx*wm, my - ny*wm); G = (ax - nx*w0, ay - ny*w0)
+    return (f"M {P(*A)} Q {P(*B)} {P(*D)} A {w1:.1f} {w1:.1f} 0 0 1 {P(*E)} "
+            f"Q {P(*F)} {P(*G)} Z")
+
+def xform(d, deg, tx, ty):
+    """Rotate a path about the origin by deg, then translate."""
+    th = math.radians(deg); co, si = math.cos(th), math.sin(th)
+    def pt(x, y):
+        return f"{x*co - y*si + tx:.1f} {x*si + y*co + ty:.1f}".replace(".0", "")
+    out, i, t = [], 0, d.split()
+    while i < len(t):
+        k = t[i]
+        if k in ("M", "L"):
+            out += [k, pt(float(t[i+1]), float(t[i+2]))]; i += 3
+        elif k == "Q":
+            out += [k, pt(float(t[i+1]), float(t[i+2])), pt(float(t[i+3]), float(t[i+4]))]; i += 5
+        elif k == "A":
+            out += [k, t[i+1], t[i+2], t[i+3], t[i+4], t[i+5], pt(float(t[i+6]), float(t[i+7]))]; i += 8
         else:
-            out.append(t); i += 1
+            out.append(k); i += 1
     return " ".join(out)
 
-def arc_shift(cx, cy, r_mid, half_c, half_e, a0, a1, dist, ang, **kw):
-    """tapered_arc translated `dist` along direction `ang` (deg)."""
-    d = tapered_arc(cx, cy, r_mid, half_c, half_e, a0, a1, **kw)
-    return shift(d, dist*math.cos(math.radians(ang)), dist*math.sin(math.radians(ang)))
+# ------------------------------------------------------------------ pieces
+def cake(x0, x1, ytop, ybot, dome=20, r_bot=30):
+    """Side view of a layer-cake slice. Returns bands front-to-back plus the
+    cream-layer fruit bits. Proportions follow the reference photo:
+    thick frosting cap, sponge, cream, sponge."""
+    h = ybot - ytop
+    f1 = ytop + h * 0.285          # frosting / sponge A
+    c0 = ytop + h * 0.515          # sponge A / cream
+    c1 = ytop + h * 0.700          # cream / sponge B
+    cx = (x0 + x1) / 2
+    frosting = (f"M {P(x0, f1)} L {P(x0, ytop + dome)} "
+                f"Q {P(cx, ytop - dome)} {P(x1, ytop + dome)} L {P(x1, f1)} Z")
+    w = x1 - x0
+    bits = (round_poly([(x0 + w*0.11, c0 + 15), (x0 + w*0.31, c0 + 11),
+                        (x0 + w*0.33, c1 - 13), (x0 + w*0.13, c1 - 10)], 11) + " " +
+            round_poly([(x0 + w*0.48, c0 + 13), (x0 + w*0.64, c0 + 16),
+                        (x0 + w*0.67, c1 - 11), (x0 + w*0.51, c1 - 14)], 11))
+    return {
+        "frosting": frosting,
+        "spongeA": poly([(x0, f1), (x1, f1), (x1, c0), (x0, c0)]),
+        "cream":   poly([(x0, c0), (x1, c0), (x1, c1), (x0, c1)]),
+        "spongeB": round_poly([(x0, c1), (x1, c1), (x1, ybot), (x0, ybot)], [0, 0, r_bot, r_bot]),
+        "bits": bits,
+        "top": ytop,
+    }
 
-# ---------------------------------------------------------------- palette
-PAL = {
-    "pastry":  ("#FFF6E4", "#FFEFD4"),   # (light appearance, dark appearance)
-    "pastry2": ("#FBE4BC", "#F0D3A6"),
-    "cream":   ("#FFCF86", "#F2BE74"),
-    "crust":   ("#D2791F", "#C06C19"),
-    "steel":   ("#FFFFFF", "#F2F7FF"),
-    "steel2":  ("#E2ECF7", "#D2DFEE"),
+def cherry(cx, cy, r, stem_to, stem_w=11):
+    return {"fruit": circle(cx, cy, r),
+            "stem": taper((cx, cy - r * 0.55), stem_to, stem_w, stem_w * 0.55, curve=-22)}
+
+def wedge(cx, cy, s, deg=0):
+    """A simplified pineapple chunk."""
+    return xform(round_poly([(-s*0.52, s*0.46), (s*0.10, -s*0.58), (s*0.54, s*0.40)], s*0.22),
+                 deg, cx, cy)
+
+def blade_shape(length, base_half, tip_half, splay, side):
+    """One blade in local coords: base at the pivot, tip at -x.
+    `side` is -1 (upper) or +1 (lower). The inner edge stays near y=0 so the
+    two blades meet at the pivot the way real scissors do."""
+    drop = length * splay * side
+    return round_poly([(18, side * base_half),
+                       (-length, drop - side * tip_half),
+                       (-length, drop + side * tip_half),
+                       (10, side * 5)],
+                      [14, tip_half * 0.82, tip_half * 0.82, 8])
+
+def scissors(pivot, deg, blade_len, arm_len, loop_r, spread, w=1.0):
+    """Open scissors seen from the side, built along a local +x axis running
+    pivot -> handles, blades along -x, then rotated into place."""
+    px, py = pivot
+    base_half, tip_half = 52 * w, 16 * w
+    blades = (blade_shape(blade_len, base_half, tip_half, 0.145, -1) + " " +
+              blade_shape(blade_len, base_half, tip_half, 0.145, 1))
+    handles = (taper((0, 0), (arm_len, -spread * 0.70), 25 * w, 19 * w) + " " +
+               taper((0, 0), (arm_len, spread * 0.70), 25 * w, 19 * w) + " " +
+               ring(arm_len + loop_r * 0.54, -spread, loop_r, loop_r * 0.42) + " " +
+               ring(arm_len + loop_r * 0.54, spread, loop_r, loop_r * 0.42))
+    return {"blades": xform(blades, deg, px, py),
+            "handles": xform(handles, deg, px, py),
+            "all": xform(blades + " " + handles, deg, px, py)}
+
+# ------------------------------------------------------------------ palette
+# Only the scissors change between appearances. Everything edible keeps one
+# palette in every appearance, which is what the HIG asks for and keeps
+# icon.json down to a single dark specialization per changing layer.
+TONES = {
+    "frosting": ("#FFFFFF", "#FFFFFF"),
+    "sponge":   ("#F9D89B", "#F9D89B"),
+    "cream":    ("#FFF6E6", "#FFF6E6"),
+    "fruit":    ("#FFC42B", "#FFC42B"),
+    "cherry":   ("#E8384C", "#E8384C"),
+    "stem":     ("#4E7F3C", "#4E7F3C"),
+    "steel":    ("#332E3B", "#A7AFC4"),
+    "steel2":   ("#453F4F", "#A7AFC4"),
 }
-BG_LIGHT = ["#FFD688", "#E8832B"]
-BG_DARK  = ["#6E4320", "#23130A"]
 
-def L(name, path, tone, opacity=1.0, glass=True):
-    lt, dk = PAL[tone]
-    return {"name": name, "d": path, "light": lt, "dark": dk,
-            "opacity": opacity, "tone": tone, "glass": glass}
+COLORWAYS = {
+    "rose":    (["#FFF0EB", "#FFC6CE"], ["#5C3039", "#2A1419"], "Rose"),
+    "vanilla": (["#FFFAEE", "#FFD79B"], ["#4E3A20", "#241A0C"], "Vanilla"),
+    "mint":    (["#EEFBF4", "#B6E9D0"], ["#1E443A", "#0D211B"], "Mint"),
+    "sky":     (["#F0F6FF", "#C2D4FF"], ["#263450", "#101726"], "Sky"),
+}
 
-CONCEPTS = []
+def L(name, d, tone, opacity=1.0):
+    lt, dk = TONES[tone]
+    return {"name": name, "d": d, "light": lt, "dark": dk,
+            "opacity": opacity, "tone": tone}
 
-# ============================================================== A. Snip
-# The seed, played straight: open scissors snipping a croissant.
-ax, ay, ar = 468, 552, 198
-piv = (710, 322)
-CONCEPTS.append({
-    "id": "snip",
-    "title": "Snip",
-    "line": "The seed played straight \u2014 open scissors closing on a croissant.",
-    "layers": [
-        L("handles", " ".join([
-            arm(piv, (638, 240), 30, 24), arm(piv, (810, 250), 30, 24),
-            ring(628, 204, 62, 30), ring(820, 216, 62, 30)]), "steel2"),
-        L("blades", " ".join([
-            blade(piv, (590, 546), 38, 20, curve=-5),
-            blade(piv, (800, 530), 38, 20, curve=5)]), "steel"),
-        L("croissant", tapered_arc(ax, ay, ar, 90, 26, 340, 560, bulge=10), "pastry2"),
-    ],
-})
+def build(cake_box, cherry_spec, sc, wedge_spec=None):
+    ck = cake(*cake_box)
+    ch = cherry(*cherry_spec)
+    layers = [
+        L("scissors-handles", sc["handles"], "steel2"),
+        L("scissors-blades", sc["blades"], "steel"),
+        L("cherry", ch["fruit"], "cherry"),
+        L("cherry-stem", ch["stem"], "stem"),
+    ]
+    if wedge_spec:
+        layers.append(L("pineapple", wedge(*wedge_spec), "fruit"))
+    layers += [
+        L("fruit-bits", ck["bits"], "fruit"),
+        L("frosting", ck["frosting"], "frosting"),
+        L("cream", ck["cream"], "cream"),
+        L("sponge-top", ck["spongeA"], "sponge"),
+        L("sponge-bottom", ck["spongeB"], "sponge"),
+    ]
+    return layers
 
-# ====================================================== B. Mille-feuille
-# Clipboard history is literally lamination; the newest clipping lifted clear.
-BX, BW, BH, BR = 236, 552, 124, 62
-CONCEPTS.append({
-    "id": "millefeuille",
-    "title": "Mille-feuille",
-    "line": "Clipboard history as lamination \u2014 stacked pastry layers, newest clipping lifted clear.",
-    "layers": [
-        L("clipping", rr(BX + 64, 266, BW - 128, BH, BR), "pastry"),
-        L("slab-top", rr(BX, 480, BW, BH, BR), "pastry"),
-        L("cream",    rr(BX + 30, 618, BW - 60, 56, 28), "cream"),
-        L("slab-bot", rr(BX, 688, BW, BH, BR), "pastry"),
-    ],
-})
+CONCEPTS = [
+    {"id": "slice-snip", "title": "Slice and Snip",
+     "line": "Scissors angled in from the upper right, blades closing across the slice.",
+     "layers": build((170, 650, 400, 830), (280, 352, 54, (340, 262)),
+                     scissors((700, 335), -40, 215, 115, 50, 56))},
+    {"id": "cherry-top", "title": "Cherry Top",
+     "line": "Cake forward: a big slice with cherry and pineapple, scissors snipping the top corner.",
+     "layers": build((200, 720, 420, 850), (330, 368, 56, (396, 274)),
+                     scissors((740, 310), -48, 180, 85, 40, 44, w=0.85),
+                     wedge_spec=(470, 364, 120, 14))},
+    {"id": "big-cut", "title": "Big Cut",
+     "line": "Scissors forward: a large pair driven diagonally down into a smaller slice.",
+     "layers": build((150, 560, 470, 850), (250, 420, 48, (304, 334)),
+                     scissors((640, 430), -33, 300, 150, 62, 72, w=1.2))},
+]
 
-# ========================================================= C. Cut Crescent
-# One bold crescent with a piece cleanly snipped off its end.
-cx3, cy3, r3 = 512, 520, 208
-CONCEPTS.append({
-    "id": "crescent",
-    "title": "Cut Crescent",
-    "line": "The most mark-like \u2014 a crescent with a piece cleanly snipped off its end.",
-    "layers": [
-        L("piece", arc_shift(cx3, cy3, r3, 80, 34, 270, 332, 56, -61), "pastry"),
-        L("crescent", tapered_arc(cx3, cy3, r3, 96, 34, -13, 258), "pastry2"),
-    ],
-})
-
-# ============================================================ D. Clipping
-# A square of pastry with its corner snipped off; a slice behind it = history.
-FX0, FY0, FX1, FY1, CH = 262, 366, 746, 850, 176
-front = round_poly([(FX0, FY0), (FX1 - CH, FY0), (FX1, FY0 + CH), (FX1, FY1), (FX0, FY1)],
-                   [114, 30, 30, 114, 114])
-corner = shift(round_poly([(FX1 - CH, FY0), (FX1, FY0), (FX1, FY0 + CH)], [26, 30, 26]), 68, -72)
-CONCEPTS.append({
-    "id": "clipping",
-    "title": "Clipping",
-    "line": "A slice of pastry with its corner snipped off and lifted away; the slice behind is the history.",
-    "layers": [
-        L("corner", corner, "pastry"),
-        L("front", front, "pastry"),
-        L("behind", rr(188, 272, 438, 438, 112), "cream"),
-    ],
-})
-
-# ------------------------------------------------------------ squircle mask
 def squircle(size=C, n=5.0, steps=76):
     a = size / 2.0
     pts = []
     for i in range(steps + 1):
         th = 2 * math.pi * i / steps
         ct, st = math.cos(th), math.sin(th)
-        rx = a / (abs(ct) ** n + abs(st) ** n) ** (1 / n) if (ct or st) else a
-        pts.append((a + rx * ct, a + rx * st))
+        r = a / (abs(ct)**n + abs(st)**n)**(1/n) if (ct or st) else a
+        pts.append((a + r*ct, a + r*st))
     return poly(pts)
 
-OUT = {
-    "canvas": C,
-    "squircle": squircle(),
-    "bg": {"light": BG_LIGHT, "dark": BG_DARK},
-    "concepts": CONCEPTS,
-}
-print(json.dumps(OUT))
+print(json.dumps({"canvas": C, "squircle": squircle(),
+                  "bg": {"light": COLORWAYS["rose"][0], "dark": COLORWAYS["rose"][1]},
+                  "colorways": COLORWAYS, "concepts": CONCEPTS}))
