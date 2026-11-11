@@ -6,6 +6,7 @@ import SwiftUI
 final class BezelController: BezelPanelDelegate {
     private let store: ClipStore
     private let paste: (Clip) -> Void
+    private let openPreferences: () -> Void
     private let hotKey: HotKeyCombination
 
     private var panel: BezelPanel?
@@ -22,14 +23,19 @@ final class BezelController: BezelPanelDelegate {
 
     private(set) var isShowing = false
 
+    /// `openPreferences` has no default on purpose. A default of `{}` is
+    /// what let ⌘, silently dismiss the bezel and do nothing in feature 7;
+    /// making the argument compulsory is what stops that happening again.
     init(
         store: ClipStore,
         hotKey: HotKeyCombination,
-        paste: @escaping (Clip) -> Void
+        paste: @escaping (Clip) -> Void,
+        openPreferences: @escaping () -> Void
     ) {
         self.store = store
         self.hotKey = hotKey
         self.paste = paste
+        self.openPreferences = openPreferences
     }
 
     /// The hotkey: opens the bezel, or walks one clip older if it is already
@@ -194,6 +200,11 @@ final class BezelController: BezelPanelDelegate {
 
         case .cancel:
             hide()
+            return
+
+        case .preferences:
+            hide()
+            openPreferences()
             return
 
         case .ignored:

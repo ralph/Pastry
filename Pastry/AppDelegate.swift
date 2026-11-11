@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var paster: Paster?
     private var bezel: BezelController?
     private var hotKey: HotKey?
+    private(set) var preferences: Preferences?
+    private var preferencesWindow: PreferencesWindowController?
     /// Whatever was active when the menu opened, so focus can go back to it.
     private var previousApp: NSRunningApplication?
     /// True between cancelling the menu and the reopen we asked for.
@@ -26,10 +28,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppEnvironment.isRunningTests else { return }
+        installPreferences()
         restoreHistory()
         startMonitoring()
         installStatusItem()
         installBezel()
+    }
+
+    /// Reads the settings and keeps the rest of the app in step with them.
+    ///
+    /// First, because the history is trimmed to the remember count as it is
+    /// restored and the menu is built with the display count.
+    private func installPreferences() {
+        let preferences = Preferences(loginItem: SystemLoginItem())
+        preferences.applyDefaultLoginItemOnce()
+        store.rememberCount = preferences.rememberCount
+
+        preferences.onChange = { [weak self] in
+            guard let self, let preferences = self.preferences else { return }
+            // Lowering Remember discards the oldest clippings at once, which
+            // ClipStore does on set and announces as a deletion — so the
+            // debounced saver flushes it rather than leaving clips on disk
+            // that the app no longer has.
+            store.rememberCount = preferences.rememberCount
+            statusMenu?.displayCount = preferences.displayCount
+        }
+
+        self.preferences = preferences
+        preferencesWindow = PreferencesWindowController(preferences: preferences)
+    }
+
+    private func showPreferences() {
+        preferencesWindow?.show()
     }
 
     private func installStatusItem() {
@@ -42,11 +72,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // no way left to quit it, so fall back to something visible.
             item.button?.title = "Pastry"
         }
-        let statusMenu = StatusMenu(store: store) { [weak self] clip in
+        let statusMenu = StatusMenu(
+            store: store,
+            displayCount: preferences?.displayCount ?? 30
+        ) { [weak self] clip in
             self?.choose(clip)
         }
         statusMenu.onWillOpen = { [weak self] in self?.menuWillOpen() }
         statusMenu.onDidClose = { [weak self] in self?.menuDidClose() }
+        statusMenu.onOpenPreferences = { [weak self] in self?.showPreferences() }
         item.menu = statusMenu.menu
         self.statusMenu = statusMenu
         statusItem = item
@@ -167,9 +201,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // configurable, and this is the single place it will come from.
         let combination = HotKeyCombination.commandShiftV
 
-        let bezel = BezelController(store: store, hotKey: combination) { [weak self] clip in
-            self?.choose(clip)
-        }
+        let bezel = BezelController(
+            store: store,
+            hotKey: combination,
+            paste: { [weak self] clip in self?.choose(clip) },
+            openPreferences: { [weak self] in self?.showPreferences() }
+        )
         self.bezel = bezel
 
         // A nil hotkey means the combination is already taken; HotKey logs

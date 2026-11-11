@@ -14,6 +14,7 @@ enum BezelAction: Equatable {
     case paste
     case delete
     case cancel
+    case preferences
     case ignored
 }
 
@@ -59,6 +60,12 @@ enum BezelKeyMap {
         // the user holds ⌘⇧ the 1 key reports "!" and would match nothing.
         // Key codes are physical positions, the same layout dependence
         // already recorded for the paste keystroke in the design spec.
+        // Matched by key code for the same reason as the digits below: with
+        // the hotkey's shift held, the comma key reports "<".
+        if Int(keyCode) == kVK_ANSI_Comma, modifiers.contains(.command) {
+            return .preferences
+        }
+
         if let digit = digit(forKeyCode: keyCode) {
             // Zero is the tenth clip, not the first: it sits after 9 on the
             // row.

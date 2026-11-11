@@ -162,10 +162,30 @@ struct BezelKeyMapTests {
         #expect(action(keyCode: UInt16(kVK_Escape)) == .cancel)
     }
 
+    @Test("command-comma opens Preferences")
+    func commandCommaOpensPreferences() {
+        #expect(action(",", keyCode: UInt16(kVK_ANSI_Comma), modifiers: [.command]) == .preferences)
+    }
+
+    /// With the hotkey's shift held the comma key reports "<", which is why
+    /// it is matched by key code like the digits.
+    @Test("command-comma still works with the hotkey's modifiers held")
+    func commandCommaWithModifiersHeld() {
+        #expect(
+            action("<", keyCode: UInt16(kVK_ANSI_Comma), modifiers: [.command, .shift])
+                == .preferences
+        )
+    }
+
+    /// Without command it is just a comma, and the bezel has no text field.
+    @Test("a bare comma does nothing")
+    func bareCommaIgnored() {
+        #expect(action(",", keyCode: UInt16(kVK_ANSI_Comma)) == .ignored)
+    }
+
     @Test("anything else is ignored")
     func otherKeysIgnored() {
         #expect(action("q", keyCode: UInt16(kVK_ANSI_Q)) == .ignored)
-        #expect(action(",", keyCode: UInt16(kVK_ANSI_Comma), modifiers: [.command]) == .ignored)
         #expect(action(keyCode: 0x42) == .ignored)
     }
 }
