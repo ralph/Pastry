@@ -117,7 +117,18 @@ struct PasterTests {
         )
 
         async let first = paster.paste("A")
-        await Task.yield()
+
+        // Task.yield() alone does not guarantee the first paste has started,
+        // which would make this test fail against correct code. Wait for the
+        // first paste to announce that it holds the guard, bounded so a
+        // regression fails rather than hangs.
+        var spins = 0
+        while !recorder.steps.contains("yieldFocus"), spins < 10_000 {
+            await Task.yield()
+            spins += 1
+        }
+        #expect(recorder.steps.contains("yieldFocus"), "the first paste never reached its wait")
+
         let second = await paster.paste("B")
         let firstOutcome = await first
 

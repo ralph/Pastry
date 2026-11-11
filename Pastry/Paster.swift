@@ -82,6 +82,11 @@ final class Paster {
             return .cancelled
         }
 
+        // The sleep can finish while the main actor is busy; a cancellation
+        // arriving in that gap cannot make it throw retroactively, so check
+        // again rather than typing into whatever has focus now.
+        if Task.isCancelled { return .cancelled }
+
         return sendPaste() ? .pasted : .keystrokeFailed
     }
 }
