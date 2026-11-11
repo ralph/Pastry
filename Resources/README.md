@@ -5,12 +5,13 @@ artwork** (`jumpcut.icns`, the `net.sf.jumpcut.*` and `com.generalarcade.*`
 PNGs and TIFFs, the preferences toolbar images) which the Pastry rewrite
 deletes along with the rest of the Objective-C tree.
 
-Two things here are **new and must survive that deletion**:
+The app icon bundle itself has moved out of here to `Pastry/Pastry.icon`,
+where the Xcode project can see it. One thing left here is **new and must
+survive that deletion**:
 
 | Path | What it is |
 |---|---|
-| `Pastry.icon/` | The app bundle icon, as an Icon Composer document: `icon.json` plus one full-canvas 1024×1024 SVG per layer. |
-| `icon/` | The vector sources, the script that builds the bundle, and the script that renders it for review. |
+| `icon/` | The vector sources, the script that builds `Pastry/Pastry.icon`, and the script that renders it for review. |
 
 ## How the icon was produced
 
@@ -21,7 +22,7 @@ the light/dark appearance variants.
 
 ```sh
 cd Resources/icon
-python3 build_icon.py       # regenerates Resources/Pastry.icon
+python3 build_icon.py       # regenerates Pastry/Pastry.icon
 python3 preview_icon.py     # renders the bundle to icon/pastry-icon.png
 ```
 
