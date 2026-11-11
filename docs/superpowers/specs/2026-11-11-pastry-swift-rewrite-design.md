@@ -205,6 +205,27 @@ asynchronously while the menu could already be tracking *and* left
 `setMenuChangedMessagesEnabled:NO` in force, so an equal-count swap left the
 drawn menu stale. Neither condition applies here.
 
+**The search field's focus dance.** A status menu tracks without activating an
+`LSUIElement` application, so nothing in it can become first responder and the
+field never sees a keystroke. The menu is therefore cancelled, Pastry activated,
+and the menu reopened — Flycut's approach. Three things about it are not
+negotiable, each learned by running it:
+
+- `NSApp.activate(ignoringOtherApps: true)`, not the cooperative
+  `NSApp.activate()`, which does not activate an agent app at all.
+- `NSApp.isActive` is **never** true for this app, even a second after
+  activating. Using it to decide anything either spins — cancel, activate,
+  never look active, cancel again, at 50% CPU — or abandons the reopen and
+  leaves the click dead. A one-shot latch distinguishes the two openings.
+- The field's `target`/`action` never fires while a menu tracks; changes
+  arrive through `controlTextDidChange`. And rebuilding the whole menu removes
+  the row holding the field, which ends its field editor and drops focus after
+  one keystroke, so only the clip rows are refreshed.
+
+Arrow keys leave the field by handing the first responder back, which is enough
+for the press itself to reach the menu. Flycut also re-posted a synthetic arrow;
+on macOS 27 that closes the menu instead.
+
 Each row carries its `Clip` in `representedObject` rather than its index.
 Capture continues while the menu is open, so a clip arriving then shifts every
 position, and an index-carrying row would act on a different clip than the one

@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let statusMenu = StatusMenu(store: store) { [weak self] clip in
             self?.choose(clip)
         }
-        statusMenu.onWillOpen = { [weak self] in self?.menuWillOpen() ?? true }
+        statusMenu.onWillOpen = { [weak self] in self?.menuWillOpen() }
         statusMenu.onDidClose = { [weak self] in self?.menuDidClose() }
         item.menu = statusMenu.menu
         self.statusMenu = statusMenu
@@ -59,6 +59,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         paster = Paster(write: { text in monitor.write(text) })
     }
 
+    /// How long to let activation settle before putting the menu back up.
+    private static let activationDelay: Duration = .milliseconds(200)
+
     /// Makes the menu's search field usable.
     ///
     /// A status menu tracks without activating an `LSUIElement` application,
@@ -66,20 +69,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// never sees a keystroke. The only way through is to cancel the menu,
     /// activate, and put it back up — which is what Flycut does.
     ///
-    /// Returns false when it cancelled the menu, so this opening stops here.
-    private func menuWillOpen() -> Bool {
-        // Set for exactly one reopen. Without it, an activation that does not
-        // take effect leaves this cancelling and reopening the menu forever,
-        // which is a hung app at 50% CPU rather than a missing focus ring.
+    /// Deliberately does **not** consult `NSApp.isActive`. For this app it
+    /// stays false even after activation and a second of waiting, so using it
+    /// to decide anything either spins — cancel, activate, never look active,
+    /// cancel again — or abandons the reopen and leaves the click dead. The
+    /// latch below is the only thing that distinguishes the two openings.
+    private func menuWillOpen() {
         if isReopeningMenu {
+            // This is the reopen we asked for; the field can take focus now.
             isReopeningMenu = false
-            focusSearchFieldShortly()
-            return true
-        }
-
-        guard !NSApp.isActive else {
-            focusSearchFieldShortly()
-            return true
+            afterActivationDelay { $0.statusMenu?.focusSearchField() }
+            return
         }
 
         isReopeningMenu = true
@@ -87,37 +87,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Activating would close the menu anyway, so close it deliberately.
         statusMenu?.menu.cancelTracking()
         // Must ignore other apps: the cooperative NSApp.activate() does not
-        // activate an LSUIElement agent, and without activation the search
-        // field can never take focus.
+        // activate an agent app at all.
         NSApp.activate(ignoringOtherApps: true)
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(200))
-            guard let button = self?.statusItem?.button else { return }
+
+        afterActivationDelay { delegate in
+            // An opening that already happened consumes the latch, so a second
+            // click inside the window cannot be followed by a stray reopen
+            // that toggles the menu shut again.
+            guard delegate.isReopeningMenu, let button = delegate.statusItem?.button else {
+                return
+            }
             // Reopened by clicking the status button, which shows the menu
             // already attached to it. Flycut reopened by replaying the
             // original mouse event, which stopped working on macOS 27
             // (upstream 8a24014); its replacement, popUpStatusItemMenu:, has
             // been deprecated since 10.14 in favour of the menu property —
-            // which is exactly what this goes through.
+            // which is exactly what this goes through. Verified by hand.
             button.performClick(nil)
         }
-        return false
     }
 
     private func menuDidClose() {
-        // Clear the latch too: if the reopen never arrived, the next opening
-        // must start the dance afresh rather than assume it is the reopen.
-        isReopeningMenu = false
-        // Hand focus back where it came from. A paste also hides Pastry, which
-        // has the same effect; this covers dismissing without choosing.
+        // Cancelling for the reopen may deliver this; the dance is still in
+        // progress, so leave the remembered application alone. Without this,
+        // the reopen would race a counter-activation and the field would come
+        // up unfocused with no way back to the app the user came from.
+        guard !isReopeningMenu else { return }
+        // Plain activate: unlike NSApplication's, NSRunningApplication's
+        // ignoringOtherApps option is a documented no-op since macOS 14.
+        // Pastry is frontmost here anyway, so yielding is uncontested.
         previousApp?.activate()
         previousApp = nil
     }
 
-    private func focusSearchFieldShortly() {
+    private func afterActivationDelay(_ body: @escaping @MainActor (AppDelegate) -> Void) {
         Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(200))
-            self?.statusMenu?.focusSearchField()
+            try? await Task.sleep(for: Self.activationDelay)
+            guard let self else { return }
+            body(self)
         }
     }
 

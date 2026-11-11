@@ -26,23 +26,28 @@ enum Keystroke {
     @MainActor
     @discardableResult
     static func commandV() -> Bool {
-        guard let source = CGEventSource(stateID: .combinedSessionState) else {
-            Log.clipboard.error("could not create an event source; nothing was pasted")
-            return false
-        }
-        let v = CGKeyCode(kVK_ANSI_V)
-        guard let down = CGEvent(keyboardEventSource: source, virtualKey: v, keyDown: true),
-              let up = CGEvent(keyboardEventSource: source, virtualKey: v, keyDown: false)
-        else {
-            Log.clipboard.error("could not build the key events; nothing was pasted")
-            return false
-        }
-
-        // Assigning flags on both events also strips any modifier the user
-        // happens to be holding, so a stray Shift cannot ride along.
-        let flags = CGEventFlags(
-            rawValue: CGEventFlags.maskCommand.rawValue | UInt64(NX_DEVICELCMDKEYMASK)
+        // Assigning flags also strips any modifier the user happens to be
+        // holding, so a stray Shift cannot ride along.
+        post(
+            CGKeyCode(kVK_ANSI_V),
+            flags: CGEventFlags(
+                rawValue: CGEventFlags.maskCommand.rawValue | UInt64(NX_DEVICELCMDKEYMASK)
+            )
         )
+    }
+
+    @MainActor
+    private static func post(_ keyCode: CGKeyCode, flags: CGEventFlags) -> Bool {
+        guard let source = CGEventSource(stateID: .combinedSessionState) else {
+            Log.clipboard.error("could not create an event source; no key was sent")
+            return false
+        }
+        guard let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
+        else {
+            Log.clipboard.error("could not build the key events; no key was sent")
+            return false
+        }
         down.flags = flags
         up.flags = flags
         down.post(tap: .cghidEventTap)
