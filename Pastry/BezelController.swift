@@ -62,10 +62,15 @@ final class BezelController: BezelPanelDelegate {
         // are told to come forward. Without activating, so the paste after
         // this one still lands where the user is typing.
         NSApp.unhideWithoutActivation()
+        // Marked as showing before it is ordered in, not after: losing key
+        // status is a dismissal, and the delegate ignores one while this is
+        // false. Were it set afterwards, a panel that gave up key status on
+        // the way in would have its dismissal dropped and stay on screen
+        // with nothing able to close it.
+        isShowing = true
         // Key without activating: the paste must land in the app the user came
         // from, and only a key window sees the modifier release.
         panel.makeKeyAndOrderFront(nil)
-        isShowing = true
     }
 
     func hide() {
