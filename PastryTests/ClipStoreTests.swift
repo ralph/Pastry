@@ -190,6 +190,57 @@ struct ClipStoreTests {
         #expect(store.search("second", limit: 10).count == 1)
     }
 
+||||||| parent of d472a88 (Persist the clipboard history)
+    @Test("announces every change to the list", arguments: [
+        "add", "remove", "clear", "merge", "moveToTop", "rememberCount",
+    ])
+    func announcesChanges(mutation: String) {
+        let store = ClipStore()
+        store.add(Clip.fixture("seed one"))
+        store.add(Clip.fixture("seed two"))
+
+        var changes = 0
+        store.onChange = { changes += 1 }
+
+        switch mutation {
+        case "add": store.add(Clip.fixture("another"))
+        case "remove": store.remove(at: 0)
+        case "clear": store.clear()
+        case "merge": store.merge()
+        case "moveToTop": store.moveToTop(Clip.fixture("seed one"))
+        case "rememberCount": store.rememberCount = 1
+        default: Issue.record("unknown mutation \(mutation)")
+        }
+
+        #expect(changes == 1)
+    }
+
+    /// Loading is not a change worth writing straight back to disk.
+    @Test("does not announce a load")
+    func loadIsNotAChange() {
+        let store = ClipStore()
+        var changes = 0
+        store.onChange = { changes += 1 }
+        store.load([Clip.fixture("from disk")])
+        #expect(changes == 0)
+        #expect(store.clips.map(\.text) == ["from disk"])
+    }
+
+    @Test("a load is trimmed to the remember count")
+    func loadTrims() {
+        let store = ClipStore(rememberCount: 2)
+        store.load([Clip.fixture("1"), Clip.fixture("2"), Clip.fixture("3")])
+        #expect(store.clips.map(\.text) == ["1", "2"])
+    }
+
+    @Test("a load replaces whatever was there")
+    func loadReplaces() {
+        let store = ClipStore()
+        store.add(Clip.fixture("existing"))
+        store.load([Clip.fixture("from disk")])
+        #expect(store.clips.map(\.text) == ["from disk"])
+    }
+
     @Test("clear empties the history")
     func clearEmpties() {
         let store = ClipStore()

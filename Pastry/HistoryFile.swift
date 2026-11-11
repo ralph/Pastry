@@ -10,7 +10,8 @@ protocol HistoryFile: Sendable {
 }
 
 struct DiskHistoryFile: HistoryFile {
-    static let url: URL = {
+    /// Where the history lives in a real install.
+    static let defaultURL: URL = {
         let base = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
@@ -18,26 +19,35 @@ struct DiskHistoryFile: HistoryFile {
         return base.appending(path: "Pastry/history.json")
     }()
 
+    let url: URL
+
+    /// The location is injectable so the disk behaviour itself — creating the
+    /// directory, writing atomically, the permissions — is testable against a
+    /// temporary directory rather than the real install.
+    init(url: URL = DiskHistoryFile.defaultURL) {
+        self.url = url
+    }
+
     func read() throws -> Data? {
-        guard FileManager.default.fileExists(atPath: Self.url.path(percentEncoded: false)) else {
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else {
             return nil
         }
-        return try Data(contentsOf: Self.url)
+        return try Data(contentsOf: url)
     }
 
     func write(_ data: Data) throws {
         try FileManager.default.createDirectory(
-            at: Self.url.deletingLastPathComponent(),
+            at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
         // Atomic, so a crash mid-write cannot leave a half-written history.
-        try data.write(to: Self.url, options: [.atomic])
+        try data.write(to: url, options: [.atomic])
         // This file holds clipboard contents; keep it to the owner. Set after
-        // the write because an atomic write replaces the file, and with it any
-        // permissions set on the previous one.
+        // the write, because an atomic write replaces the file and with it any
+        // permissions the previous one carried.
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o600],
-            ofItemAtPath: Self.url.path(percentEncoded: false)
+            ofItemAtPath: url.path(percentEncoded: false)
         )
     }
 }
