@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 
 /// Owns the menu-bar status item and the clipboard capture pipeline.
 ///
@@ -17,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var saver: DebouncedSaver?
     private(set) var monitor: ClipboardMonitor?
     private(set) var paster: Paster?
+    private var bezel: BezelController?
+    private var hotKey: HotKey?
     /// Whatever was active when the menu opened, so focus can go back to it.
     private var previousApp: NSRunningApplication?
     /// True between cancelling the menu and the reopen we asked for.
@@ -27,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         restoreHistory()
         startMonitoring()
         installStatusItem()
+        installBezel()
     }
 
     private func installStatusItem() {
@@ -154,6 +158,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try? await Task.sleep(for: Self.activationDelay)
             guard let self else { return }
             body(self)
+        }
+    }
+
+    private func installBezel() {
+        let bezel = BezelController(store: store) { [weak self] clip in
+            self?.choose(clip)
+        }
+        self.bezel = bezel
+
+        // ⇧⌘V, the combination Flycut used. Feature 9 makes it configurable.
+        hotKey = HotKey(
+            keyCode: UInt32(kVK_ANSI_V),
+            modifiers: HotKey.Modifiers.commandShift
+        ) { [weak bezel] in
+            bezel?.hotKeyPressed()
+        }
+        if hotKey == nil {
+            Log.clipboard.error("the hotkey is unavailable; another app may already own it")
         }
     }
 
