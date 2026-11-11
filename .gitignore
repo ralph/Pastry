@@ -14,3 +14,12 @@ Pastry.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 
 # Release artifacts, which the release workflow writes to the repository root
 *.dmg
+
+# Signing material. These never belong in the repository — they go to GitHub
+# Actions secrets. Ignored so that an export left here by accident cannot be
+# committed by a careless `git add -A`.
+*.p12
+*.p8
+*.cer
+*.certSigningRequest
+*.mobileprovision
