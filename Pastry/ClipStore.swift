@@ -11,12 +11,19 @@ final class ClipStore {
     private(set) var clips: [Clip] = []
 
     /// How many clips to keep. Lowering it discards the oldest immediately.
+    ///
+    /// Clamped at zero: a negative count would make `trim()` remove more clips
+    /// than the list holds, which traps. Feature 8 binds this to a Preferences
+    /// control, so the value stops being under this file's control.
     var rememberCount: Int {
-        didSet { trim() }
+        didSet {
+            rememberCount = max(0, rememberCount)
+            trim()
+        }
     }
 
     init(rememberCount: Int = 40) {
-        self.rememberCount = rememberCount
+        self.rememberCount = max(0, rememberCount)
     }
 
     var count: Int { clips.count }

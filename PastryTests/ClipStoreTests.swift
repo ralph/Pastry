@@ -68,6 +68,29 @@ struct ClipStoreTests {
         #expect(store.clips.map(\.text) == ["5", "4"])
     }
 
+    /// A negative count made trim() remove more clips than the list held,
+    /// which traps. Feature 8 binds this to a Preferences control.
+    @Test("survives a negative remember count instead of trapping")
+    func negativeRememberCountIsClamped() {
+        let store = ClipStore()
+        for text in ["1", "2", "3"] { store.add(Clip.fixture(text)) }
+        store.rememberCount = -1
+        #expect(store.rememberCount == 0)
+        #expect(store.count == 0)
+    }
+
+    @Test("clamps a negative remember count passed to the initialiser")
+    func negativeRememberCountInInitIsClamped() {
+        #expect(ClipStore(rememberCount: -5).rememberCount == 0)
+    }
+
+    @Test("a remember count of zero keeps nothing")
+    func zeroRememberCountKeepsNothing() {
+        let store = ClipStore(rememberCount: 0)
+        store.add(Clip.fixture("vanishes"))
+        #expect(store.count == 0)
+    }
+
     @Test("reads a clip by index and returns nil out of range")
     func clipAtIndex() {
         let store = ClipStore()

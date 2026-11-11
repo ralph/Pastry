@@ -42,10 +42,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func record(_ clip: Clip) {
         store.add(clip)
-        // Length and source app only. Clip text is the user's clipboard and
+        // Size and source app only. Clip text is the user's clipboard and
         // never goes to the unified log, which other processes can read.
+        // utf8.count is O(1); String.count would walk every grapheme of a
+        // multi-megabyte clip on the main actor just to log a number.
         Log.clipboard.info(
-            "captured \(clip.text.count) characters from \(clip.appName ?? "an unknown app", privacy: .public); history now \(self.store.count)"
+            "captured \(clip.text.utf8.count) bytes from \(clip.appName ?? "an unknown app", privacy: .public); history now \(self.store.count)"
         )
     }
 }

@@ -43,8 +43,14 @@ final class ClipboardMonitor {
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 // Tolerance lets the kernel coalesce these wakeups with others;
-                // this process is otherwise idle all day.
-                try? await Task.sleep(for: interval, tolerance: .milliseconds(100))
+                // this process is otherwise idle all day. A cancelled sleep
+                // ends the loop here: swallowing the error would let one more
+                // poll run after stop() returned.
+                do {
+                    try await Task.sleep(for: interval, tolerance: .milliseconds(100))
+                } catch {
+                    return
+                }
                 // Dropped without stop() being called: end the loop rather
                 // than poll a monitor nobody owns any more.
                 guard let self else { return }
