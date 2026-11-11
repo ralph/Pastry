@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26'
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep macosx
+
+      - name: Build
+        run: |
+          xcodebuild -project Pastry.xcodeproj -scheme Pastry \
+            -configuration Debug build-for-testing CODE_SIGNING_ALLOWED=NO
+
+      - name: Test
+        run: |
+          xcodebuild -project Pastry.xcodeproj -scheme Pastry \
+            -configuration Debug test-without-building CODE_SIGNING_ALLOWED=NO

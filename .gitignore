@@ -2,10 +2,12 @@
 *.swp
 *~.nib
 build/
+DerivedData/
 *.pbxuser
 *.perspective
 *.perspectivev3
 *.mode1v3
 *.mode2v3
-xcuserdata
-xcshareddata
+xcuserdata/
+*.xcuserdatad
+.swiftpm/

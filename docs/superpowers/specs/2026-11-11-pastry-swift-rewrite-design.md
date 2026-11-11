@@ -184,6 +184,14 @@ Pastry, a separator, Quit. Typing in the search field re-filters the rows live;
 Rebuilds its rows in place rather than removing and re-adding the whole menu, so
 the menu redraws correctly when the row count is unchanged.
 
+Attaching the menu to the status item is a plain `statusItem.menu` assignment.
+The search field in feature 5 complicates that: making the field first
+responder requires activating the app, which closes the menu the click just
+opened, so the menu has to be reopened afterwards. Flycut did that by replaying
+the original mouse event, which **stopped working on macOS 27** (upstream
+commit `8a24014`). The working approach, and the one to implement, is
+`statusItem.popUpStatusItemMenu(_:)` after activation.
+
 ### 5.6 `BezelController` + `BezelWindow`
 
 SwiftUI content hosted in an `NSPanel` configured `.nonactivatingPanel` and
