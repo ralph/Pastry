@@ -14,6 +14,14 @@ struct Clip: Equatable, Codable, Sendable {
     /// Characters shown per row in the status menu. The bezel shows the full text.
     static let displayLength = 40
 
+    /// How much of a clip the bezel draws.
+    ///
+    /// A clip can be megabytes, and the bezel re-renders on the main actor
+    /// every time the selection moves — laying all of it out would stall the
+    /// walk the user is in the middle of. Far more than fits the panel
+    /// anyway.
+    static let previewLength = 4_000
+
     let text: String
     let appName: String?
     let appBundleURL: URL?
@@ -41,6 +49,17 @@ struct Clip: Equatable, Codable, Sendable {
     /// the cost is bounded by the display length rather than the clip size —
     /// this runs once per visible row every time the menu opens, and a clip can
     /// hold megabytes of pasted text.
+    /// The clip as the bezel shows it: the real text, line breaks and all,
+    /// but bounded.
+    ///
+    /// Bounded with `prefix`, which walks only as far as it takes rather
+    /// than counting the whole string first.
+    var previewText: String {
+        let head = text.prefix(Self.previewLength)
+        guard head.endIndex < text.endIndex else { return text }
+        return String(head) + "…"
+    }
+
     var displayText: String {
         var collapsed = ""
         collapsed.reserveCapacity(Self.displayLength + 1)

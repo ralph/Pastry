@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var saver: DebouncedSaver?
     private(set) var monitor: ClipboardMonitor?
     private(set) var paster: Paster?
+    private var bezel: BezelController?
+    private var hotKey: HotKey?
     /// Whatever was active when the menu opened, so focus can go back to it.
     private var previousApp: NSRunningApplication?
     /// True between cancelling the menu and the reopen we asked for.
@@ -27,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         restoreHistory()
         startMonitoring()
         installStatusItem()
+        installBezel()
     }
 
     private func installStatusItem() {
@@ -157,11 +160,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func installBezel() {
+        // One value for the combination, shared by the registration and by
+        // the bezel, which has to know which key walks the history and which
+        // modifiers releasing ends the interaction. Feature 9 makes it
+        // configurable, and this is the single place it will come from.
+        let combination = HotKeyCombination.commandShiftV
+
+        let bezel = BezelController(store: store, hotKey: combination) { [weak self] clip in
+            self?.choose(clip)
+        }
+        self.bezel = bezel
+
+        // A nil hotkey means the combination is already taken; HotKey logs
+        // the reason. The menu still works, so this is not fatal.
+        hotKey = HotKey(combination: combination) { [weak self] in
+            guard let self else { return }
+            // A paste in flight sends ⌘V to whatever window is key once the
+            // focus handoff has settled. Showing the bezel now would make it
+            // that window, so the keystroke would walk its history instead
+            // of pasting and the clip would go nowhere. The wait is 0.2 s.
+            guard paster?.isPasting != true else { return }
+            bezel.hotKeyPressed()
+        }
+    }
+
     /// Pastes a chosen clip into the application the user came from.
     private func choose(_ clip: Clip) {
-        store.moveToTop(clip)
         Task { [weak self] in
-            guard let outcome = await self?.paster?.paste(clip.text) else { return }
+            guard let self, let paster else { return }
+            let outcome = await paster.paste(clip.text)
+            // Reordered only once something actually happened. A paste that
+            // overlaps one already in flight is dropped, and moving the clip
+            // to the top for it would rearrange the history visibly with no
+            // pasted text to show for it.
+            if outcome != .alreadyPasting { store.moveToTop(clip) }
             Log.clipboard.info(
                 "chose a clip of \(clip.text.utf8.count) bytes: \(outcome.rawValue, privacy: .public)"
             )

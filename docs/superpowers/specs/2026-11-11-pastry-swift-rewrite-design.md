@@ -291,20 +291,41 @@ is open advances to the next older clipping, which is what makes
 | Input | Action |
 | --- | --- |
 | hotkey key again, or ↓ / → / `j` | older clipping |
-| ⇧ + hotkey key, or ↑ / ← / `k` | newer clipping |
+| ↑ / ← / `k` | newer clipping |
 | `1`–`9`, `0` | jump to position 1–10 |
 | Home / End | newest / oldest |
 | Page Up / Page Down | ±10 |
 | Return | paste the shown clipping |
 | Delete / Backspace | remove the shown clipping, stay open |
 | Escape | dismiss without pasting |
-| ⌘, | open Preferences |
-| scroll wheel | cycle clippings |
-| double-click | paste |
-| **release ⌘ and ⇧** | paste the shown clipping |
+| clicking away | dismiss without pasting |
+| **release the hotkey's modifiers** | paste the shown clipping |
 
 Modifier release pasting is the primary interaction, and follows from sticky
 bezel being off.
+
+Three rows of Flycut's table are deliberately absent, found while building
+feature 7:
+
+- **⇧ + hotkey key for a newer clipping.** Unreachable for any combination
+  that contains shift, which ⇧⌘V does. Carbon claims the whole registered
+  combination and calls the hotkey handler rather than delivering the key to
+  the bezel, so a tap with ⇧⌘ held can only ever mean "older"; the tap that
+  does reach the bezel is the one made after letting go of part of the
+  combination. ↑, ← and `k` are how the user walks the other way.
+- **⌘, for Preferences.** There is no Preferences window until feature 8, and
+  a key that silently dismissed the bezel would be worse than one that does
+  nothing. It arrives with the window.
+- **Scroll wheel and double-click.** Not implemented; the bezel is a keyboard
+  interaction held open by the modifiers, and reaching for the mouse means
+  letting go of them, which pastes. Dropped rather than deferred.
+
+The letter and digit keys are matched by **key code, not by the character the
+event carries**. The bezel is used with the hotkey's modifiers held down, and
+`charactersIgnoringModifiers` still applies Shift: while the user holds ⌘⇧ the
+`1` key reports `!` and `j` reports `J`. This is the same physical-position
+dependence already recorded for the paste keystroke in §7, and for the same
+unavoidable reason.
 
 When the list is empty the bezel shows an "Empty" state and pastes nothing.
 
