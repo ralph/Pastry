@@ -3,7 +3,7 @@
 Pastry's own history. Flycut's, up to 1.9.7, is in
 [that project's repository](https://github.com/TermiT/Flycut).
 
-## Unreleased — 0.1.0
+## 0.1.0 — 2026-11-11
 
 The first Pastry. A Swift rewrite of Flycut, built from nothing and carrying
 over no Objective-C.
