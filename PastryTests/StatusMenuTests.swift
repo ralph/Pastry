@@ -134,6 +134,58 @@ struct StatusMenuTests {
         #expect(clipTitles(menu) == ["arrived while closed"])
     }
 
+    @Test("shows a search field below the clip rows")
+    func hasASearchField() {
+        let (_, menu) = makeMenu(clips: ["a"])
+        let fieldRow = menu.menu.items.firstIndex { $0.view is SearchFieldView }
+        let lastClipRow = menu.menu.items.lastIndex { $0.representedObject is Clip }
+        #expect(fieldRow != nil)
+        #expect(lastClipRow != nil)
+        if let fieldRow, let lastClipRow { #expect(fieldRow > lastClipRow) }
+    }
+
+    @Test("narrows the rows to clips containing the query")
+    func filtersRows() {
+        let (_, menu) = makeMenu(clips: ["alpha", "beta", "alpha two"])
+        menu.setQueryForTesting("alpha")
+        refresh(menu)
+        #expect(clipTitles(menu) == ["alpha two", "alpha"])
+    }
+
+    @Test("shows a no-match row when the query matches nothing")
+    func noMatchRow() {
+        let (_, menu) = makeMenu(clips: ["alpha"])
+        menu.setQueryForTesting("zzz")
+        refresh(menu)
+        #expect(clipRows(menu).isEmpty)
+        #expect(menu.menu.items.first?.title == "No matches")
+        #expect(menu.menu.items.first?.action == nil)
+    }
+
+    /// A filter that outlived the menu would silently hide clips the next time
+    /// it opened, with nothing on screen explaining why.
+    @Test("forgets the query when the menu closes")
+    func queryResetsOnClose() {
+        let (_, menu) = makeMenu(clips: ["alpha", "beta"])
+        menu.setQueryForTesting("alpha")
+        refresh(menu)
+        #expect(clipTitles(menu) == ["alpha"])
+
+        menu.menuDidClose(menu.menu)
+        refresh(menu)
+
+        #expect(menu.query.isEmpty)
+        #expect(clipTitles(menu) == ["beta", "alpha"])
+    }
+
+    @Test("keeps the empty-history wording when there is nothing at all")
+    func emptyHistoryWordingWins() {
+        let (_, menu) = makeMenu()
+        menu.setQueryForTesting("anything")
+        refresh(menu)
+        #expect(menu.menu.items.first?.title == "No clippings")
+    }
+
     @Test("refreshing does not accumulate rows")
     func refreshIsIdempotent() {
         let (_, menu) = makeMenu(clips: ["a"])
