@@ -49,15 +49,18 @@ final class ClipStore {
         clips.remove(at: index)
     }
 
-    /// Moves an existing clip to the top, keeping its source app and date.
+    /// Moves a clip already in the history to the top, keeping its source app
+    /// and date.
     ///
-    /// Choosing a clip is not copying it afresh: the bezel shows when the text
-    /// was first copied, so re-adding it through `add(_:)` — which stamps the
-    /// current date — would be wrong.
-    func moveToTop(at index: Int) {
-        guard let clip = clip(at: index) else { return }
-        clips.remove(at: index)
-        clips.insert(clip, at: 0)
+    /// Identified by text, the same identity `add(_:)` deduplicates on, rather
+    /// than by position: the caller may be acting on a list that has shifted
+    /// since it read it. Choosing a clip is also not copying it afresh — the
+    /// bezel shows when the text was first copied, so re-adding it through
+    /// `add(_:)`, which stamps the current date, would be wrong.
+    func moveToTop(_ clip: Clip) {
+        guard let index = clips.firstIndex(where: { $0.text == clip.text }) else { return }
+        let existing = clips.remove(at: index)
+        clips.insert(existing, at: 0)
     }
 
     func clear() {

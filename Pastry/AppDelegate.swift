@@ -9,13 +9,14 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var statusItem: NSStatusItem?
-    private(set) var statusMenu: StatusMenu?
+    /// Retained here because NSMenu's delegate and NSMenuItem's target are both
+    /// weak, so nothing else keeps the menu's controller alive.
+    private var statusMenu: StatusMenu?
     private(set) var store = ClipStore()
     private(set) var monitor: ClipboardMonitor?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppEnvironment.isRunningTests else { return }
-        // The monitor first: choosing a menu row writes through it.
         startMonitoring()
         installStatusItem()
     }
@@ -50,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// pastes it into the frontmost application.
     private func choose(_ clip: Clip) {
         monitor?.write(clip.text)
+        store.moveToTop(clip)
         Log.clipboard.info("copied a clip of \(clip.text.utf8.count) bytes back to the pasteboard")
     }
 

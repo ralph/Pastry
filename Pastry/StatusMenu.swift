@@ -4,7 +4,7 @@ import AppKit
 ///
 /// Rows are rebuilt as the menu is about to open rather than whenever the
 /// history changes: the menu is then always current, there is nothing to
-/// observe, and a capture while the menu is closed costs no UI work at all.
+/// observe, and a capture while the menu is closed costs no UI work.
 @MainActor
 final class StatusMenu: NSObject, NSMenuDelegate {
     let menu = NSMenu()
@@ -19,6 +19,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         self.onSelect = onSelect
         super.init()
         menu.delegate = self
+        // AppKit rebuilds before every display; this is only so the menu is
+        // never in an empty state if something reads it before then.
         rebuild()
     }
 
@@ -26,53 +28,52 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         rebuild()
     }
 
-    func rebuild() {
+    private func rebuild() {
         menu.removeAllItems()
         addClipRows()
         menu.addItem(.separator())
-        addItem("Clear All", #selector(clearAll))
-        addItem("Merge All", #selector(mergeAll))
+        addItem("Clear All", action: #selector(clearAll), target: self)
+        addItem("Merge All", action: #selector(mergeAll), target: self)
         menu.addItem(.separator())
-        addItem("About Pastry", #selector(about))
-        menu.addItem(
-            withTitle: "Quit Pastry",
-            action: #selector(NSApplication.terminate(_:)),
-            keyEquivalent: "q"
-        )
+        addItem("About Pastry", action: #selector(about), target: self)
+        addItem("Quit Pastry", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
 
     private func addClipRows() {
         let clips = store.clips.prefix(displayCount)
         guard !clips.isEmpty else {
-            let empty = NSMenuItem(title: "No clippings", action: nil, keyEquivalent: "")
-            empty.isEnabled = false
-            menu.addItem(empty)
+            // A nil action is what disables the row. Setting isEnabled would
+            // do nothing: NSMenu.autoenablesItems is on, and it recomputes the
+            // enabled state at display time.
+            addItem("No clippings", action: nil)
             return
         }
-        for (index, clip) in clips.enumerated() {
-            let item = NSMenuItem(
-                title: clip.displayText,
-                action: #selector(selectClip(_:)),
-                keyEquivalent: ""
-            )
-            item.target = self
-            item.tag = index
-            menu.addItem(item)
+        for clip in clips {
+            let item = addItem(clip.displayText, action: #selector(selectClip(_:)), target: self)
+            // The row carries the clip itself, not its position. A capture can
+            // land while the menu is open — the monitor keeps polling — which
+            // shifts every index, and an index-carrying row would then act on
+            // a different clip than the one whose title the user read.
+            item.representedObject = clip
         }
     }
 
-    private func addItem(_ title: String, _ action: Selector) {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-        item.target = self
-        menu.addItem(item)
+    @discardableResult
+    private func addItem(
+        _ title: String,
+        action: Selector?,
+        keyEquivalent: String = "",
+        target: AnyObject? = nil
+    ) -> NSMenuItem {
+        let item = menu.addItem(withTitle: title, action: action, keyEquivalent: keyEquivalent)
+        // A nil target sends the action up the responder chain, which is how
+        // Quit reaches NSApplication.
+        item.target = target
+        return item
     }
 
     @objc private func selectClip(_ sender: NSMenuItem) {
-        // The tag is the row's index at the time the menu was built. A capture
-        // can land while the menu is open, so read through the store rather
-        // than holding the clip, and tolerate the index being gone.
-        guard let clip = store.clip(at: sender.tag) else { return }
-        store.moveToTop(at: sender.tag)
+        guard let clip = sender.representedObject as? Clip else { return }
         onSelect(clip)
     }
 
@@ -85,7 +86,7 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     @objc private func about() {
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         NSApp.orderFrontStandardAboutPanel(nil)
     }
 }

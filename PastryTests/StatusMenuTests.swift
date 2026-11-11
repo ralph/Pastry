@@ -13,113 +13,133 @@ struct StatusMenuTests {
         let store = ClipStore()
         for text in clips { store.add(Clip.fixture(text)) }
         let menu = StatusMenu(store: store, displayCount: displayCount, onSelect: onSelect)
-        menu.rebuild()
+        refresh(menu)
         return (store, menu)
     }
 
-    private func titles(_ menu: StatusMenu) -> [String] {
-        menu.menu.items.map(\.title)
+    /// Drives the same delegate callback AppKit makes before the menu opens,
+    /// so every test exercises the real path.
+    private func refresh(_ menu: StatusMenu) {
+        menu.menuNeedsUpdate(menu.menu)
+    }
+
+    /// The clip rows, found by their action rather than by position — feature 5
+    /// adds a search field above them.
+    private func clipRows(_ menu: StatusMenu) -> [NSMenuItem] {
+        menu.menu.items.filter { $0.representedObject is Clip }
+    }
+
+    private func clipTitles(_ menu: StatusMenu) -> [String] {
+        clipRows(menu).map(\.title)
+    }
+
+    private func choose(_ item: NSMenuItem) {
+        _ = item.target?.perform(item.action, with: item)
     }
 
     @Test("lists the clips newest first")
     func listsClipsNewestFirst() {
         let (_, menu) = makeMenu(clips: ["oldest", "newest"])
-        #expect(Array(titles(menu).prefix(2)) == ["newest", "oldest"])
+        #expect(clipTitles(menu) == ["newest", "oldest"])
     }
 
     @Test("shows each clip's display text, not its raw text")
     func usesDisplayText() {
         let (_, menu) = makeMenu(clips: ["two\nlines"])
-        #expect(titles(menu).first == "two lines")
+        #expect(clipTitles(menu) == ["two lines"])
     }
 
     @Test("lists at most the display count")
     func capsRowsAtDisplayCount() {
         let (_, menu) = makeMenu(clips: ["1", "2", "3", "4", "5"], displayCount: 2)
-        #expect(Array(titles(menu).prefix(2)) == ["5", "4"])
-        #expect(!titles(menu).contains("3"))
+        #expect(clipTitles(menu) == ["5", "4"])
     }
 
-    @Test("shows a disabled placeholder when the history is empty")
+    @Test("shows an unclickable placeholder when the history is empty")
     func emptyStatePlaceholder() {
         let (_, menu) = makeMenu()
         let first = menu.menu.items.first
         #expect(first?.title == "No clippings")
-        #expect(first?.isEnabled == false)
+        // A nil action is what makes it unclickable. isEnabled would be
+        // recomputed by AppKit at display time, so asserting it proves nothing.
+        #expect(first?.action == nil)
     }
 
     @Test("offers Clear All, Merge All, About and Quit")
     func fixedItemsPresent() {
         let (_, menu) = makeMenu(clips: ["a"])
-        let rows = titles(menu)
-        #expect(rows.contains("Clear All"))
-        #expect(rows.contains("Merge All"))
-        #expect(rows.contains("About Pastry"))
-        #expect(rows.contains("Quit Pastry"))
+        #expect(menu.menu.item(withTitle: "Clear All") != nil)
+        #expect(menu.menu.item(withTitle: "Merge All") != nil)
+        #expect(menu.menu.item(withTitle: "About Pastry") != nil)
+        #expect(menu.menu.item(withTitle: "Quit Pastry") != nil)
     }
 
-    @Test("Quit is wired to terminate on Command-Q")
+    @Test("Quit terminates through the responder chain on Command-Q")
     func quitWiring() {
         let (_, menu) = makeMenu()
-        let quit = menu.menu.items.first { $0.title == "Quit Pastry" }
+        let quit = menu.menu.item(withTitle: "Quit Pastry")
         #expect(quit?.action == #selector(NSApplication.terminate(_:)))
         #expect(quit?.keyEquivalent == "q")
+        // No target, so the action travels the responder chain to NSApp.
+        #expect(quit?.target == nil)
     }
 
     @Test("choosing a row reports that clip")
     func choosingARowReportsTheClip() {
         var chosen: [String] = []
         let (_, menu) = makeMenu(clips: ["older", "newer"]) { chosen.append($0.text) }
-        let row = menu.menu.items[1]
-        _ = row.target?.perform(row.action, with: row)
+        choose(clipRows(menu)[1])
         #expect(chosen == ["older"])
     }
 
-    @Test("choosing a row moves it to the top of the history")
-    func choosingARowMovesItToTheTop() {
-        let (store, menu) = makeMenu(clips: ["older", "newer"])
-        let row = menu.menu.items[1]
-        _ = row.target?.perform(row.action, with: row)
-        #expect(store.clips.map(\.text) == ["older", "newer"])
+    /// The monitor keeps polling while the menu is open, so a clip can arrive
+    /// and shift every row's position. A row that carried its index would then
+    /// act on a different clip than the one whose title the user read.
+    @Test("a row still reports its own clip after a capture shifts the history")
+    func rowSurvivesHistoryShiftWhileOpen() {
+        var chosen: [String] = []
+        let (store, menu) = makeMenu(clips: ["older", "newer"]) { chosen.append($0.text) }
+        let row = clipRows(menu)[1]
+
+        store.add(Clip.fixture("arrived while the menu was open"))
+        choose(row)
+
+        #expect(chosen == ["older"])
     }
 
     @Test("Clear All empties the history and the rows")
     func clearAllEmptiesTheStore() {
         let (store, menu) = makeMenu(clips: ["a", "b"])
-        let clear = menu.menu.items.first { $0.title == "Clear All" }!
-        _ = clear.target?.perform(clear.action, with: clear)
+        choose(menu.menu.item(withTitle: "Clear All")!)
         #expect(store.count == 0)
-        menu.rebuild()
-        #expect(titles(menu).first == "No clippings")
+        refresh(menu)
+        #expect(menu.menu.items.first?.title == "No clippings")
     }
 
     @Test("Merge All joins the history into one clip on top")
     func mergeAllJoins() {
         let (store, menu) = makeMenu(clips: ["first", "second"])
-        let merge = menu.menu.items.first { $0.title == "Merge All" }!
-        _ = merge.target?.perform(merge.action, with: merge)
+        choose(menu.menu.item(withTitle: "Merge All")!)
         #expect(store.clips.first?.text == "first\nsecond")
     }
 
-    /// Rows are refreshed from the delegate callback AppKit makes just before
-    /// the menu opens. If that stopped happening the menu would show whatever
-    /// existed at launch, so assert the callback itself does the work.
-    @Test("the menu delegate callback refreshes the rows")
-    func delegateCallbackRebuilds() {
+    @Test("the delegate callback picks up a clip captured while the menu was closed")
+    func refreshPicksUpNewClips() {
         let (store, menu) = makeMenu()
-        #expect(titles(menu).first == "No clippings")
+        #expect(menu.menu.items.first?.title == "No clippings")
 
         store.add(Clip.fixture("arrived while closed"))
-        menu.menuNeedsUpdate(menu.menu)
-        #expect(titles(menu).first == "arrived while closed")
+        refresh(menu)
+
+        #expect(clipTitles(menu) == ["arrived while closed"])
     }
 
-    @Test("rebuilding does not accumulate rows")
-    func rebuildIsIdempotent() {
+    @Test("refreshing does not accumulate rows")
+    func refreshIsIdempotent() {
         let (_, menu) = makeMenu(clips: ["a"])
         let before = menu.menu.items.count
-        menu.rebuild()
-        menu.rebuild()
+        refresh(menu)
+        refresh(menu)
         #expect(menu.menu.items.count == before)
     }
 }

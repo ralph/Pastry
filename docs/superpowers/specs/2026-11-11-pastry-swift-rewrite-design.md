@@ -187,8 +187,16 @@ search field, a separator, Clear All, Merge All, Preferences… (⌘,), About
 Pastry, a separator, Quit. Typing in the search field re-filters the rows live;
 ↑/↓ from the field move into the rows.
 
-Rebuilds its rows in place rather than removing and re-adding the whole menu, so
-the menu redraws correctly when the row count is unchanged.
+Rebuilds its rows from scratch in `menuNeedsUpdate(_:)`, which AppKit calls
+before the menu is laid out. Flycut instead reused items, because it rebuilt
+asynchronously while the menu could already be tracking *and* left
+`setMenuChangedMessagesEnabled:NO` in force, so an equal-count swap left the
+drawn menu stale. Neither condition applies here.
+
+Each row carries its `Clip` in `representedObject` rather than its index.
+Capture continues while the menu is open, so a clip arriving then shifts every
+position, and an index-carrying row would act on a different clip than the one
+whose title the user read.
 
 Attaching the menu to the status item is a plain `statusItem.menu` assignment.
 The search field in feature 5 complicates that: making the field first
