@@ -3,23 +3,10 @@ import Testing
 
 @Suite("AppEnvironment")
 struct AppEnvironmentTests {
-    @Test("detects a test run from the XCTest configuration variable")
-    func detectsFromEnvironment() {
-        let environment = ["XCTestConfigurationFilePath": "/tmp/whatever.xctestconfiguration"]
-        #expect(AppEnvironment.isRunningTests(environment: environment, hasXCTestClass: false))
-    }
-
-    @Test("detects a test run from the presence of the XCTest runtime")
-    func detectsFromRuntime() {
-        #expect(AppEnvironment.isRunningTests(environment: [:], hasXCTestClass: true))
-    }
-
-    @Test("reports a normal launch when neither signal is present")
-    func detectsNormalLaunch() {
-        #expect(!AppEnvironment.isRunningTests(environment: [:], hasXCTestClass: false))
-    }
-
-    @Test("reports a test run for the live process, since this is one")
+    /// The guard's whole premise is that this signal is present in a hosted
+    /// test run. If it ever stops being set, this is what catches it — before
+    /// the app starts skipping its own setup in production.
+    @Test("detects that this very process is a test run")
     func liveProcessIsATestRun() {
         #expect(AppEnvironment.isRunningTests)
     }

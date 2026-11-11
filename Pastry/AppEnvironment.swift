@@ -2,21 +2,15 @@ import Foundation
 
 /// Whether this process is running a test bundle rather than a real launch.
 ///
-/// Unit tests are hosted by the app, so the app delegate runs during every
-/// test. Side effects such as timers, status items and global hotkeys are
-/// skipped when this reports `true`.
+/// The unit tests are hosted by the app, so launching them launches Pastry and
+/// runs its delegate. Side effects — the status item now, a pasteboard timer
+/// and a global hotkey later — are skipped when this reports `true`.
+///
+/// `XCTestConfigurationFilePath` is set on the host process by `xcodebuild
+/// test`, for Swift Testing as well as XCTest, and is the only signal used. A
+/// false positive would leave the shipping app running but completely inert,
+/// so one narrow check is worth more than several broad ones.
 enum AppEnvironment {
-    static var isRunningTests: Bool {
-        isRunningTests(
-            environment: ProcessInfo.processInfo.environment,
-            hasXCTestClass: NSClassFromString("XCTestCase") != nil
-        )
-    }
-
-    static func isRunningTests(
-        environment: [String: String],
-        hasXCTestClass: Bool
-    ) -> Bool {
-        environment["XCTestConfigurationFilePath"] != nil || hasXCTestClass
-    }
+    static let isRunningTests =
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 }

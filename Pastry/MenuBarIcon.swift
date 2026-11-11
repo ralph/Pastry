@@ -2,17 +2,12 @@ import AppKit
 
 /// The glyph shown in the menu bar.
 ///
-/// Rendered from an SF Symbol as a template image so it tracks light and dark
-/// mode, menu bar tinting and accessibility sizes without shipping bitmaps.
+/// An SF Symbol rather than a bundled bitmap, so it tracks light and dark
+/// mode, menu bar tinting and accessibility sizes on its own. Symbol images
+/// are already template images, so nothing here sets `isTemplate`; the test
+/// asserts it anyway, to catch a future swap to a non-template asset.
 enum MenuBarIcon {
-    static let symbolName = "scissors"
-
     static func image() -> NSImage? {
-        let image = NSImage(
-            systemSymbolName: symbolName,
-            accessibilityDescription: "Pastry"
-        )
-        image?.isTemplate = true
-        return image
+        NSImage(systemSymbolName: "scissors", accessibilityDescription: "Pastry")
     }
 }
