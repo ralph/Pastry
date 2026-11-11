@@ -119,7 +119,13 @@ jobs:
             args+=(CODE_SIGN_IDENTITY="Developer ID Application"
                    CODE_SIGN_STYLE=Manual
                    DEVELOPMENT_TEAM="$TEAM_ID"
-                   OTHER_CODE_SIGN_FLAGS=--timestamp)
+                   OTHER_CODE_SIGN_FLAGS=--timestamp
+                   # Without this Xcode injects com.apple.security.
+                   # get-task-allow — the "allow debugging" entitlement —
+                   # and Apple rejects the submission for it. archive plus
+                   # exportArchive strips it when exporting; a direct build
+                   # does not, so it has to be turned off here.
+                   CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
           else
             args+=(CODE_SIGNING_ALLOWED=NO)
           fi
@@ -143,6 +149,15 @@ jobs:
           fi
           if ! echo "$details" | grep -q '^Timestamp='; then
             echo "::error::No secure timestamp; Apple will reject this."
+            exit 1
+          fi
+          # The third thing Apple refuses a submission for, and the one that
+          # comes back if the build settings drift: a debug entitlement in a
+          # distribution build.
+          if codesign -d --entitlements - --xml "$app" 2>/dev/null \
+               | grep -q 'get-task-allow'; then
+            echo "::error::The executable requests com.apple.security.get-task-allow."
+            echo "::error::Apple rejects that. CODE_SIGN_INJECT_BASE_ENTITLEMENTS must be NO."
             exit 1
           fi
 
