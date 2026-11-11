@@ -310,7 +310,8 @@ Two rows of Flycut's table are deliberately absent, found while building
 feature 7:
 
 - **⇧ + hotkey key for a newer clipping.** Unreachable for any combination
-  that contains shift, which ⇧⌘V does. Carbon claims the whole registered
+  that contains shift, which the default ⇧⌘V does — and feature 9 lets the
+  user choose another that also might. Carbon claims the whole registered
   combination and calls the hotkey handler rather than delivering the key to
   the bezel, so a tap with ⇧⌘ held can only ever mean "older"; the tap that
   does reach the bezel is the one made after letting go of part of the
@@ -368,9 +369,35 @@ next launch. A registration still awaiting approval is reported in the window,
 with a button to System Settings, because macOS answers `register()` that way
 rather than with an error.
 
-**Hotkeys** — one `KeyRecorderView` for the bezel hotkey, default ⇧⌘V
-(key code 9 with command+shift). Arrives with feature 9, as the window's
-second tab.
+**Hotkeys** — one key recorder for the bezel hotkey, default ⇧⌘V (key code 9
+with command and shift).
+
+A combination must carry at least one of ⌘, ⌃ and ⌥, decided in feature 9.
+Shift may join them but never stands alone: ⇧V is a capital V, so such a
+hotkey would fire whenever the user typed that letter, in any application,
+and they could never type it again. The recorder says so rather than storing
+it. Caps lock, fn and the numeric-pad flag are filtered out of what is
+stored — they ride along on ordinary events and would make a combination
+Carbon could never match again. Escape cancels the recording rather than
+being recorded, since it is also the bezel's dismiss key.
+
+The new combination is **registered before the old one is released**. Carbon
+is the only thing that knows whether another application already owns a
+combination, and `RegisterEventHotKey` refusing is how that is discovered;
+releasing the old one first would leave Pastry with no hotkey at all after a
+refusal. Two different combinations never collide, so both are live for the
+instant in between. A refused combination **reverts** to the one that works
+and the tab says it is taken, rather than storing a hotkey that does nothing.
+
+The combination is shown as a Mac shortcut always is — ⌃⌥⇧⌘ then the key —
+and the key is named by asking the **current keyboard layout** through
+`UCKeyTranslate`, not from a fixed table. A key code is a physical position
+(§7), so a table would name the key wrongly for anyone not on ANSI. Keys with
+no character of their own — arrows, function keys, Space, Return — come from
+a small table instead.
+
+Changing it takes effect at once: `BezelController.hotKey` is settable, and
+the release check and the key map both read it afresh.
 
 ## 7. Persistence
 
