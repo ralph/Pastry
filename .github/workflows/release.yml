@@ -233,29 +233,54 @@ jobs:
           xcrun stapler validate "$DMG"
           echo "notarized=true" >> "$GITHUB_OUTPUT"
 
+      # Runs on every build, not only on tags, so a workflow_dispatch run
+      # exercises the extraction instead of leaving it untested until a tag.
+      - name: Assemble the release notes
+        id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
+          NOTARIZED: ${{ steps.notarize.outputs.notarized }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/notes.md"
+          python3 - "$VERSION" CHANGELOG.md > "$notes" <<'PY'
+          import re, sys
+          version, path = sys.argv[1], sys.argv[2]
+          text = open(path, encoding="utf-8").read()
+          # Bounded, so a tag of 1.0 cannot match the heading for 0.1.0.
+          pattern = r"(?<![\w.])" + re.escape(version) + r"(?![\w.])"
+          for section in re.split(r"^## ", text, flags=re.M)[1:]:
+              heading, _, body = section.partition("\n")
+              if re.search(pattern, heading):
+                  sys.stdout.write(body.strip() + "\n")
+                  break
+          PY
+          if [ ! -s "$notes" ]; then
+            echo "::warning::No CHANGELOG.md section for $VERSION; using a bare title."
+            printf 'Pastry %s\n' "$VERSION" > "$notes"
+          fi
+          # The two states that must never be mistaken for a finished build.
+          if [ "$SIGNED" != "true" ]; then
+            printf '\n---\n\n**Unsigned build** — the signing secrets were not set when this ran, so macOS will refuse to open it.\n' >> "$notes"
+          elif [ "$NOTARIZED" != "true" ]; then
+            printf '\n---\n\n**Signed but not notarized** — the notary secrets were incomplete, so Gatekeeper will still block this.\n' >> "$notes"
+          else
+            printf '\n---\n\n**Install:** download `Pastry-%s.dmg`, open it, drag Pastry to Applications. The disk image is signed and notarized, so it opens without a Gatekeeper warning. Pastry is a menu-bar app — it has no Dock icon, and quits from **Quit Pastry** in its menu.\n' "$VERSION" >> "$notes"
+          fi
+          echo "notes=$notes" >> "$GITHUB_OUTPUT"
+          echo "--- notes ---"; cat "$notes"
+
       - name: Publish a draft release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
           DMG: ${{ steps.package.outputs.dmg }}
-          SIGNED: ${{ steps.signing.outputs.signed }}
-          NOTARIZED: ${{ steps.notarize.outputs.notarized }}
+          NOTES: ${{ steps.notes.outputs.notes }}
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          notes="Pastry $VERSION"
-          if [ "$SIGNED" != "true" ]; then
-            warning="**Unsigned build** — the signing secrets were not set"
-            warning="$warning when this ran, so macOS will refuse to open it."
-            notes="$notes"$'\n\n'"$warning"
-          elif [ "$NOTARIZED" != "true" ]; then
-            # Signed but not notarized looks finished and is not: Gatekeeper
-            # still blocks it on a machine that has never seen the app.
-            warning="**Signed but not notarized** — the notary secrets were"
-            warning="$warning incomplete, so Gatekeeper will still block this."
-            notes="$notes"$'\n\n'"$warning"
-          fi
           # Idempotent for a re-run after a flake, but only while the
           # release is still a draft: once it is published, people may
           # already have the DMG, and replacing it silently would swap what
@@ -268,10 +293,10 @@ jobs:
             fi
             echo "Draft release $TAG exists; replacing the asset."
             gh release upload "$TAG" "$DMG" --clobber
-            gh release edit "$TAG" --notes "$notes"
+            gh release edit "$TAG" --notes-file "$NOTES"
           else
             gh release create "$TAG" "$DMG" \
-              --title "Pastry $VERSION" --notes "$notes" --draft
+              --title "Pastry $VERSION" --notes-file "$NOTES" --draft
           fi
 
       # Also kept as an artifact, so a manual run that publishes nothing
