@@ -110,6 +110,21 @@ struct StatusMenuTests {
         #expect(menu.searchField.frame.minY > 0)
     }
 
+/// Exploratory: does the row follow the menu back down?
+    @Test("the search field row shrinks again when long clippings go")
+    func searchFieldShrinks() throws {
+        let long = "a clipping long enough to make the menu a good deal wider than the default"
+        let (store, menu) = makeMenu(clips: [long])
+        let container = try #require(menu.searchFieldItem.view)
+        let wide = container.frame.width
+
+        store.clear()
+        store.add(Clip.fixture("x"))
+        refresh(menu)
+
+        #expect(container.frame.width < wide)
+    }
+
     @Test("Settings uses the standard shortcut and calls back")
     func settingsWiring() {
         let (_, menu) = makeMenu()

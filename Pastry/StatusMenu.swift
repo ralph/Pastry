@@ -76,6 +76,10 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSSearchFieldDelegate {
     /// rebuilt.
     private func stretchSearchField() {
         guard let container = searchFieldItem.view else { return }
+        // Shrunk before measuring: this row is an item like any other, so a
+        // wide one keeps the menu wide and the menu would never narrow again
+        // after one long clipping.
+        container.setFrameSize(NSSize(width: Self.minimumSearchWidth, height: container.frame.height))
         let width = max(menu.size.width, Self.minimumSearchWidth)
         guard abs(container.frame.width - width) > 0.5 else { return }
         container.setFrameSize(NSSize(width: width, height: container.frame.height))
