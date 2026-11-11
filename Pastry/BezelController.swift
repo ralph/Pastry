@@ -7,7 +7,10 @@ final class BezelController: BezelPanelDelegate {
     private let store: ClipStore
     private let paste: (Clip) -> Void
     private let openPreferences: () -> Void
-    private let hotKey: HotKeyCombination
+    /// Settable: feature 9 lets the user change the combination while the
+    /// app runs. Everything that reads it — the release check and the key
+    /// map — reads it afresh each time, so nothing else happens on a change.
+    var hotKey: HotKeyCombination
 
     private var panel: BezelPanel?
     private var hosting: NSHostingView<BezelView>?

@@ -65,6 +65,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let preferences else { return }
         store.rememberCount = preferences.rememberCount
         statusMenu?.displayCount = preferences.displayCount
+
+        // Compared against what is actually registered rather than acted on
+        // blindly: onChange carries no payload, so this runs for every tick
+        // of a stepper in the General tab too, and re-registering a Carbon
+        // hotkey for an unchanged value would be absurd.
+        guard let bezel, preferences.hotKey != bezel.hotKey else { return }
+        let previous = bezel.hotKey
+        if !registerHotKey(preferences.hotKey) {
+            preferences.reportHotKeyRefused(revertingTo: previous)
+        }
     }
 
     private func showPreferences() {
@@ -203,9 +213,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installBezel() {
         // One value for the combination, shared by the registration and by
         // the bezel, which has to know which key walks the history and which
-        // modifiers releasing ends the interaction. Feature 9 makes it
-        // configurable, and this is the single place it will come from.
-        let combination = HotKeyCombination.commandShiftV
+        // modifiers releasing ends the interaction.
+        let combination = preferences?.hotKey ?? .commandShiftV
 
         let bezel = BezelController(
             store: store,
@@ -215,17 +224,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.bezel = bezel
 
-        // A nil hotkey means the combination is already taken; HotKey logs
-        // the reason. The menu still works, so this is not fatal.
-        hotKey = HotKey(combination: combination) { [weak self] in
-            guard let self else { return }
-            // A paste in flight sends ⌘V to whatever window is key once the
-            // focus handoff has settled. Showing the bezel now would make it
-            // that window, so the keystroke would walk its history instead
-            // of pasting and the clip would go nowhere. The wait is 0.2 s.
-            guard paster?.isPasting != true else { return }
-            bezel.hotKeyPressed()
+        if !registerHotKey(combination) {
+            // Already owned by another application. The menu still works, so
+            // this is not fatal — but the Hotkeys tab has to say so.
+            Log.clipboard.error("the hotkey is unavailable; another app may already own it")
+            preferences?.reportHotKeyRefused(revertingTo: combination)
         }
+    }
+
+    /// Registers `combination`, releasing whatever was registered before it.
+    ///
+    /// The new one is registered *first*. Carbon is the only thing that knows
+    /// whether another application already owns a combination, and releasing
+    /// the old one first would mean a refusal left Pastry with no hotkey at
+    /// all. Two different combinations never collide, so both can be live for
+    /// the instant in between.
+    ///
+    /// - Returns: whether the new combination took.
+    private func registerHotKey(_ combination: HotKeyCombination) -> Bool {
+        guard let replacement = HotKey(combination: combination, onPress: { [weak self] in
+            self?.hotKeyPressed()
+        }) else {
+            return false
+        }
+        hotKey?.unregister()
+        hotKey = replacement
+        bezel?.hotKey = combination
+        return true
+    }
+
+    private func hotKeyPressed() {
+        // A paste in flight sends ⌘V to whatever window is key once the focus
+        // handoff has settled. Showing the bezel now would make it that
+        // window, so the keystroke would walk its history instead of pasting
+        // and the clip would go nowhere. The wait is 0.2 s.
+        guard paster?.isPasting != true else { return }
+        bezel?.hotKeyPressed()
     }
 
     /// Pastes a chosen clip into the application the user came from.

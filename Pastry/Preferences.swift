@@ -33,6 +33,7 @@ final class Preferences {
     private var storedRememberCount: Int
     private var storedDisplayCount: Int
     private var storedLaunchAtLogin: Bool
+    private var storedHotKey: HotKeyCombination
 
     var rememberCount: Int {
         get { storedRememberCount }
@@ -67,6 +68,23 @@ final class Preferences {
     /// happens at login until the user allows it.
     private(set) var loginItemNeedsApproval: Bool
 
+    /// The combination that summons the bezel.
+    var hotKey: HotKeyCombination {
+        get { storedHotKey }
+        set {
+            guard newValue != storedHotKey else { return }
+            storedHotKey = newValue
+            // A fresh choice is not the refused one, whatever happened last.
+            hotKeyIsUnavailable = false
+            newValue.write(to: defaults)
+            onChange?()
+        }
+    }
+
+    /// True when the combination the user asked for was already owned by
+    /// another application. The previous one stays registered.
+    private(set) var hotKeyIsUnavailable = false
+
     init(defaults: UserDefaults = .standard, loginItem: LoginItem) {
         self.defaults = defaults
         self.loginItem = loginItem
@@ -80,6 +98,18 @@ final class Preferences {
         storedDisplayCount = Self.clamp(defaults.integer(forKey: Key.displayCount))
         storedLaunchAtLogin = loginItem.isEnabled
         loginItemNeedsApproval = loginItem.needsApproval
+        storedHotKey = HotKeyCombination(defaults: defaults) ?? .commandShiftV
+    }
+
+    /// Puts the working combination back after Carbon refused the new one.
+    ///
+    /// Assigned through the backing property rather than `hotKey`, which
+    /// would clear the very flag being set, and would announce a change that
+    /// is really the undoing of one.
+    func reportHotKeyRefused(revertingTo previous: HotKeyCombination) {
+        storedHotKey = previous
+        previous.write(to: defaults)
+        hotKeyIsUnavailable = true
     }
 
     /// Reads the system's launch-at-login state back into the mirror.
