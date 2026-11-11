@@ -15,6 +15,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var store = ClipStore()
     private(set) var monitor: ClipboardMonitor?
     private(set) var paster: Paster?
+    /// Whatever was active when the menu opened, so focus can go back to it.
+    private var previousApp: NSRunningApplication?
+    /// True between cancelling the menu and the reopen we asked for.
+    private var isReopeningMenu = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppEnvironment.isRunningTests else { return }
@@ -35,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let statusMenu = StatusMenu(store: store) { [weak self] clip in
             self?.choose(clip)
         }
+        statusMenu.onWillOpen = { [weak self] in self?.menuWillOpen() ?? true }
+        statusMenu.onDidClose = { [weak self] in self?.menuDidClose() }
         item.menu = statusMenu.menu
         self.statusMenu = statusMenu
         statusItem = item
@@ -51,6 +57,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // strongly: this delegate owns both for the process lifetime, so there
         // is no cycle, and a nil monitor would mean pasting stale text.
         paster = Paster(write: { text in monitor.write(text) })
+    }
+
+    /// Makes the menu's search field usable.
+    ///
+    /// A status menu tracks without activating an `LSUIElement` application,
+    /// so nothing inside it can become first responder and the search field
+    /// never sees a keystroke. The only way through is to cancel the menu,
+    /// activate, and put it back up — which is what Flycut does.
+    ///
+    /// Returns false when it cancelled the menu, so this opening stops here.
+    private func menuWillOpen() -> Bool {
+        // Set for exactly one reopen. Without it, an activation that does not
+        // take effect leaves this cancelling and reopening the menu forever,
+        // which is a hung app at 50% CPU rather than a missing focus ring.
+        if isReopeningMenu {
+            isReopeningMenu = false
+            focusSearchFieldShortly()
+            return true
+        }
+
+        guard !NSApp.isActive else {
+            focusSearchFieldShortly()
+            return true
+        }
+
+        isReopeningMenu = true
+        previousApp = NSWorkspace.shared.frontmostApplication
+        // Activating would close the menu anyway, so close it deliberately.
+        statusMenu?.menu.cancelTracking()
+        // Must ignore other apps: the cooperative NSApp.activate() does not
+        // activate an LSUIElement agent, and without activation the search
+        // field can never take focus.
+        NSApp.activate(ignoringOtherApps: true)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(200))
+            guard let button = self?.statusItem?.button else { return }
+            // Reopened by clicking the status button, which shows the menu
+            // already attached to it. Flycut reopened by replaying the
+            // original mouse event, which stopped working on macOS 27
+            // (upstream 8a24014); its replacement, popUpStatusItemMenu:, has
+            // been deprecated since 10.14 in favour of the menu property —
+            // which is exactly what this goes through.
+            button.performClick(nil)
+        }
+        return false
+    }
+
+    private func menuDidClose() {
+        // Clear the latch too: if the reopen never arrived, the next opening
+        // must start the dance afresh rather than assume it is the reopen.
+        isReopeningMenu = false
+        // Hand focus back where it came from. A paste also hides Pastry, which
+        // has the same effect; this covers dismissing without choosing.
+        previousApp?.activate()
+        previousApp = nil
+    }
+
+    private func focusSearchFieldShortly() {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(200))
+            self?.statusMenu?.focusSearchField()
+        }
     }
 
     /// Pastes a chosen clip into the application the user came from.

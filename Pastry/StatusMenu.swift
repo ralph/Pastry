@@ -12,7 +12,7 @@ final class SearchFieldView: NSView {}
 /// history changes: the menu is then always current, there is nothing to
 /// observe, and a capture while the menu is closed costs no UI work.
 @MainActor
-final class StatusMenu: NSObject, NSMenuDelegate {
+final class StatusMenu: NSObject, NSMenuDelegate, NSSearchFieldDelegate {
     let menu = NSMenu()
 
     /// What the user has typed into the search field.
@@ -34,10 +34,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private lazy var searchFieldItem: NSMenuItem = {
         let container = SearchFieldView(frame: NSRect(x: 0, y: 0, width: 240, height: 28))
         searchField.frame = NSRect(x: 12, y: 2, width: 216, height: 24)
-        searchField.target = self
-        searchField.action = #selector(queryChanged(_:))
-        searchField.sendsWholeSearchString = false
-        searchField.sendsSearchStringImmediately = true
+        // The field's target/action never fires while the menu is tracking —
+        // the text arrives but the action does not — so changes come through
+        // the text-editing delegate instead, which is what Flycut relied on.
+        searchField.delegate = self
         container.addSubview(searchField)
         let item = NSMenuItem()
         item.view = container
@@ -50,13 +50,12 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         self.onSelect = onSelect
         super.init()
         menu.delegate = self
-        // AppKit rebuilds before every display; this is only so the menu is
-        // never in an empty state if something reads it before then.
-        rebuild()
+        buildFixedItems()
+        refreshClipRows()
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        rebuild()
+        refreshClipRows()
     }
 
     func menuWillOpen(_ menu: NSMenu) {
@@ -85,11 +84,16 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     func setQueryForTesting(_ text: String) {
         searchField.stringValue = text
         query = text
+        refreshClipRows()
     }
 
-    private func rebuild() {
+    /// The rows that never change, built once.
+    ///
+    /// Built once because the search field lives in one of them: removing it
+    /// from the menu ends its field editor, so a rebuild that took it out
+    /// would drop focus after a single keystroke.
+    private func buildFixedItems() {
         menu.removeAllItems()
-        addClipRows()
         menu.addItem(searchFieldItem)
         menu.addItem(.separator())
         addItem("Clear All", action: #selector(clearAll), target: self)
@@ -99,22 +103,42 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         addItem("Quit Pastry", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
 
-    private func addClipRows() {
+    /// Replaces just the clip rows, which sit above the search field.
+    ///
+    /// Safe to call while the menu is open — that is what filtering as the
+    /// user types does — because it never touches the row holding the field.
+    private func refreshClipRows() {
+        while let first = menu.items.first, first !== searchFieldItem {
+            menu.removeItem(first)
+        }
+
         let clips = store.search(query, limit: displayCount)
         guard !clips.isEmpty else {
             // A nil action is what disables the row. Setting isEnabled would
             // do nothing: NSMenu.autoenablesItems is on, and it recomputes the
             // enabled state at display time.
-            addItem(store.count == 0 ? "No clippings" : "No matches", action: nil)
+            let empty = NSMenuItem(
+                title: store.count == 0 ? "No clippings" : "No matches",
+                action: nil,
+                keyEquivalent: ""
+            )
+            menu.insertItem(empty, at: 0)
             return
         }
-        for clip in clips {
-            let item = addItem(clip.displayText, action: #selector(selectClip(_:)), target: self)
+
+        for (index, clip) in clips.enumerated() {
+            let item = NSMenuItem(
+                title: clip.displayText,
+                action: #selector(selectClip(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
             // The row carries the clip itself, not its position. A capture can
             // land while the menu is open — the monitor keeps polling — which
             // shifts every index, and an index-carrying row would then act on
             // a different clip than the one whose title the user read.
             item.representedObject = clip
+            menu.insertItem(item, at: index)
         }
     }
 
@@ -132,9 +156,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         return item
     }
 
-    @objc private func queryChanged(_ sender: NSSearchField) {
-        query = sender.stringValue
-        rebuild()
+    func controlTextDidChange(_ notification: Notification) {
+        guard let field = notification.object as? NSSearchField, field === searchField else { return }
+        query = field.stringValue
+        refreshClipRows()
     }
 
     @objc private func selectClip(_ sender: NSMenuItem) {
@@ -151,7 +176,9 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     }
 
     @objc private func about() {
-        NSApp.activate()
+        // Ignoring other apps on purpose: the cooperative form does not
+        // activate an agent app, and the panel would open behind everything.
+        NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(nil)
     }
 }
