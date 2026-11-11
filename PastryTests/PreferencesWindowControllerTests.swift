@@ -45,6 +45,32 @@ struct PreferencesWindowControllerTests {
         controller.window?.close()
     }
 
+    /// The "Open…" button sends the user to System Settings to approve
+    /// Pastry and they come back to a window that was never closed, so the
+    /// refresh cannot live only in show().
+    @Test("refreshes the login state when its window becomes key")
+    func refreshesOnBecomingKey() {
+        let item = FakeLoginItem()
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: item)
+        let controller = PreferencesWindowController(preferences: preferences)
+        controller.show()
+        #expect(!preferences.launchAtLogin)
+
+        item.isEnabled = true
+        controller.windowDidBecomeKey(Notification(name: NSWindow.didBecomeKeyNotification))
+        #expect(preferences.launchAtLogin)
+        controller.window?.close()
+    }
+
+    /// Without it the window would never be told it became key.
+    @Test("is its own window's delegate")
+    func isTheWindowDelegate() {
+        let controller = makeController()
+        controller.show()
+        #expect(controller.window?.delegate === controller)
+        controller.window?.close()
+    }
+
     @Test("gives the window a title and a close button")
     func looksLikeAWindow() {
         let controller = makeController()

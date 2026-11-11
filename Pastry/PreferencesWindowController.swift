@@ -10,7 +10,7 @@ import SwiftUI
 /// responder chain, which the scene does not hand out. The app keeps an empty
 /// `Settings` scene only because `App` requires one.
 @MainActor
-final class PreferencesWindowController {
+final class PreferencesWindowController: NSObject, NSWindowDelegate {
     private(set) var window: NSWindow?
     private let preferences: Preferences
 
@@ -18,6 +18,18 @@ final class PreferencesWindowController {
 
     init(preferences: Preferences) {
         self.preferences = preferences
+        super.init()
+    }
+
+    // MARK: - NSWindowDelegate
+
+    /// The launch-at-login state can change while this window is open and
+    /// in the background — the "Open…" button sends the user to System
+    /// Settings to approve Pastry, and they come back to a window that was
+    /// never closed. Refreshing only in `show()` would leave it saying
+    /// "waiting for your approval" after the approval was given.
+    func windowDidBecomeKey(_ notification: Notification) {
+        preferences.refreshLoginItemState()
     }
 
     func show() {
@@ -31,8 +43,8 @@ final class PreferencesWindowController {
         // NSApp.isActive, which is never true for this app — the lesson from
         // features 3, 5 and 7.
         NSApp.activate(ignoringOtherApps: true)
-        // The system's launch-at-login state can have been changed in System
-        // Settings since this window was last up.
+        // Covers the case the delegate cannot: a window that is already key
+        // gets no windowDidBecomeKey when it is shown again.
         preferences.refreshLoginItemState()
         window.makeKeyAndOrderFront(nil)
     }
@@ -47,6 +59,7 @@ final class PreferencesWindowController {
             defer: false
         )
         window.title = "Pastry Settings"
+        window.delegate = self
         window.contentViewController = NSHostingController(
             rootView: PreferencesView(preferences: preferences)
         )
@@ -54,7 +67,11 @@ final class PreferencesWindowController {
         // Where the user put it last, falling back to the middle of the
         // screen. Centring on every reopen would move a window the user had
         // deliberately placed, because a closed window is not a visible one.
-        if !window.setFrameUsingName(Self.frameName) {
+        //
+        // force: true because this window is not resizable, and without it
+        // AppKit declines to apply a saved frame to a window that cannot be
+        // resized — so the position would never come back.
+        if !window.setFrameUsingName(Self.frameName, force: true) {
             window.center()
         }
         window.setFrameAutosaveName(Self.frameName)
