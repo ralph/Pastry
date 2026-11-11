@@ -133,3 +133,91 @@ final class HotKey {
         return true
     }
 }
+
+extension HotKeyCombination {
+    private enum Key {
+        static let keyCode = "hotKeyKeyCode"
+        static let modifiers = "hotKeyModifiers"
+    }
+
+    /// Reads a stored combination, or nil when there is none or what is there
+    /// cannot be used. These are ordinary defaults keys and anything at all
+    /// can have written them.
+    init?(defaults: UserDefaults) {
+        guard defaults.object(forKey: Key.keyCode) != nil,
+              defaults.object(forKey: Key.modifiers) != nil else { return nil }
+        let stored = HotKeyCombination(
+            keyCode: UInt16(truncatingIfNeeded: defaults.integer(forKey: Key.keyCode)),
+            modifiers: NSEvent.ModifierFlags(
+                rawValue: UInt(bitPattern: defaults.integer(forKey: Key.modifiers))
+            )
+        )
+        guard stored.isUsableAsHotKey else { return nil }
+        self = stored
+    }
+
+    func write(to defaults: UserDefaults) {
+        defaults.set(Int(keyCode), forKey: Key.keyCode)
+        defaults.set(Int(bitPattern: modifiers.rawValue), forKey: Key.modifiers)
+    }
+
+    /// Shift alone does not count: ⇧V is a capital V, so such a hotkey would
+    /// fire whenever the user typed that letter, in any application, and they
+    /// could never type it again.
+    var isUsableAsHotKey: Bool {
+        !modifiers.intersection([.command, .control, .option]).isEmpty
+    }
+
+    /// As a Mac shortcut is always written: ⌃⌥⇧⌘ and then the key.
+    var displayString: String {
+        var text = ""
+        if modifiers.contains(.control) { text += "⌃" }
+        if modifiers.contains(.option) { text += "⌥" }
+        if modifiers.contains(.shift) { text += "⇧" }
+        if modifiers.contains(.command) { text += "⌘" }
+        return text + Self.keyName(for: keyCode)
+    }
+
+    /// The keys that carry no character of their own.
+    private static let specialKeyNames: [Int: String] = [
+        kVK_Space: "Space", kVK_Return: "Return", kVK_ANSI_KeypadEnter: "Enter",
+        kVK_Tab: "Tab", kVK_Escape: "Escape", kVK_Delete: "Delete",
+        kVK_ForwardDelete: "⌦", kVK_Home: "Home", kVK_End: "End",
+        kVK_PageUp: "Page Up", kVK_PageDown: "Page Down",
+        kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑", kVK_DownArrow: "↓",
+        kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4", kVK_F5: "F5",
+        kVK_F6: "F6", kVK_F7: "F7", kVK_F8: "F8", kVK_F9: "F9", kVK_F10: "F10",
+        kVK_F11: "F11", kVK_F12: "F12",
+    ]
+
+    /// Names a key by asking the keyboard layout the user is actually using.
+    ///
+    /// A key code is a physical position — the limitation the design spec
+    /// records for the paste keystroke — so a fixed table would name the key
+    /// wrongly for anyone not on ANSI. This asks what that position produces.
+    private static func keyName(for keyCode: UInt16) -> String {
+        if let special = specialKeyNames[Int(keyCode)] { return special }
+        return translated(keyCode)?.uppercased() ?? "Key \(keyCode)"
+    }
+
+    private static func translated(_ keyCode: UInt16) -> String? {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let data = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
+        else { return nil }
+        let layout = Unmanaged<CFData>.fromOpaque(data).takeUnretainedValue() as Data
+        return layout.withUnsafeBytes { raw -> String? in
+            guard let header = raw.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self)
+            else { return nil }
+            var deadKeys: UInt32 = 0
+            var length = 0
+            var characters = [UniChar](repeating: 0, count: 4)
+            let status = UCKeyTranslate(
+                header, keyCode, UInt16(kUCKeyActionDisplay), 0,
+                UInt32(LMGetKbdType()), OptionBits(kUCKeyTranslateNoDeadKeysBit),
+                &deadKeys, characters.count, &length, &characters
+            )
+            guard status == noErr, length > 0 else { return nil }
+            return String(utf16CodeUnits: characters, count: length)
+        }
+    }
+}
