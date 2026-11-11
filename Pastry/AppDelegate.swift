@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// weak, so nothing else keeps the menu's controller alive.
     private var statusMenu: StatusMenu?
     private(set) var store = ClipStore()
+    private let history = HistoryStore()
+    private var saver: DebouncedSaver?
     private(set) var monitor: ClipboardMonitor?
     private(set) var paster: Paster?
     /// Whatever was active when the menu opened, so focus can go back to it.
@@ -22,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppEnvironment.isRunningTests else { return }
+        restoreHistory()
         startMonitoring()
         installStatusItem()
     }
@@ -44,6 +47,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.menu = statusMenu.menu
         self.statusMenu = statusMenu
         statusItem = item
+    }
+
+    private func restoreHistory() {
+        store.load(history.load())
+
+        let saver = DebouncedSaver { [history] clips in history.save(clips) }
+        store.onChange = { [weak self, weak saver] urgency in
+            guard let self, let saver else { return }
+            saver.schedule(self.store.clips)
+            // Deleting is meant to take effect now, not at the next quiet
+            // moment: a force quit in between would bring the clips back.
+            if urgency == .immediate { saver.flush() }
+        }
+        self.saver = saver
+        Log.clipboard.info("restored \(self.store.count) clips from disk")
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // A pending write has no later moment to wait for.
+        saver?.flush()
     }
 
     private func startMonitoring() {

@@ -10,6 +10,20 @@ import Foundation
 final class ClipStore {
     private(set) var clips: [Clip] = []
 
+    /// How soon a change needs to reach disk.
+    enum Urgency {
+        /// Can wait for a quiet moment.
+        case routine
+        /// Must be written now. Removing clips is the user deleting
+        /// something; leaving it in a buffer means a crash or a force quit in
+        /// the next couple of seconds brings it back.
+        case immediate
+    }
+
+    /// Fires after any change to the list, so the history can be written.
+    /// Not fired by `load(_:)`, which is where the list came from.
+    var onChange: ((Urgency) -> Void)?
+
     /// How many clips to keep. Lowering it discards the oldest immediately.
     ///
     /// Clamped at zero: a negative count would make `trim()` remove more clips
@@ -19,6 +33,7 @@ final class ClipStore {
         didSet {
             rememberCount = max(0, rememberCount)
             trim()
+            onChange?(.routine)
         }
     }
 
@@ -54,11 +69,13 @@ final class ClipStore {
         clips.removeAll { $0.text == clip.text }
         clips.insert(clip, at: 0)
         trim()
+        onChange?(.routine)
     }
 
     func remove(at index: Int) {
         guard clip(at: index) != nil else { return }
         clips.remove(at: index)
+        onChange?(.immediate)
     }
 
     /// Moves a clip already in the history to the top, keeping its source app
@@ -73,10 +90,21 @@ final class ClipStore {
         guard let index = clips.firstIndex(where: { $0.text == clip.text }) else { return }
         let existing = clips.remove(at: index)
         clips.insert(existing, at: 0)
+        onChange?(.routine)
     }
 
     func clear() {
         clips.removeAll()
+        onChange?(.immediate)
+    }
+
+    /// Replaces the history with what was read from disk.
+    ///
+    /// Deliberately silent: this *is* the saved state, so announcing it would
+    /// only schedule a write of what was just read.
+    func load(_ clips: [Clip]) {
+        self.clips = clips
+        trim()
     }
 
     /// Joins every clip, oldest first, into one new clip at the top.
@@ -84,6 +112,8 @@ final class ClipStore {
     /// Below two clips there is nothing to join, and merging anyway would
     /// replace the lone clip's source app and timestamp with Pastry's own —
     /// losing attribution the bezel displays, in exchange for nothing.
+    /// Announces through `add(_:)` rather than itself, so one merge is one
+    /// change rather than two.
     func merge() {
         guard clips.count > 1 else { return }
         let merged = clips.reversed().map(\.text).joined(separator: "\n")
