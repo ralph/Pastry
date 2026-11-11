@@ -3,6 +3,7 @@ import Testing
 @testable import Pastry
 
 @Suite("DiskHistoryFile")
+@MainActor
 struct DiskHistoryFileTests {
     /// A unique temporary location, so these exercise the real file system
     /// without touching the install's own history.

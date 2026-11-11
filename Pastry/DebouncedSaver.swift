@@ -4,11 +4,20 @@ import Foundation
 ///
 /// Every capture is a change, and so is choosing a clip, which moves it to the
 /// top. Writing the whole history for each would mean a file write per event.
+///
+/// Writes happen on the main actor, deliberately. Moving them to a detached
+/// task to avoid encoding megabytes on the main thread introduced three
+/// separate ways to lose data: a slow write finishing after a later one and
+/// resurrecting clips the user had deleted, termination not waiting for a
+/// write already in flight, and a stale failed write restoring itself over
+/// newer clips. Doing the work in order on one actor removes all three by
+/// construction. The cost is a possible hitch when the history is unusually
+/// large, which is the better trade for the user's clipboard history.
 @MainActor
 final class DebouncedSaver {
     private let delay: Duration
     private let maxDelay: Duration
-    private let save: @Sendable ([Clip]) -> Bool
+    private let save: ([Clip]) -> Bool
 
     private var pending: [Clip]?
     /// When the oldest unwritten change arrived, so a steady stream of changes
@@ -26,7 +35,7 @@ final class DebouncedSaver {
     init(
         delay: Duration = .seconds(2),
         maxDelay: Duration = .seconds(10),
-        save: @escaping @Sendable ([Clip]) -> Bool
+        save: @escaping ([Clip]) -> Bool
     ) {
         self.delay = delay
         self.maxDelay = maxDelay
@@ -50,11 +59,11 @@ final class DebouncedSaver {
                 // Superseded by a later change, which owns the write now.
                 return
             }
-            await self?.writePending()
+            self?.flush()
         }
     }
 
-    /// Writes any pending change immediately, on this thread.
+    /// Writes any pending change immediately.
     ///
     /// For termination, where there is no later moment to wait for, and for
     /// changes that must not sit in a buffer — clearing the history is meant
@@ -62,34 +71,15 @@ final class DebouncedSaver {
     func flush() {
         task?.cancel()
         task = nil
-        guard let clips = takePending() else { return }
-        if !save(clips) { restorePending(clips) }
-    }
-
-    private func writePending() async {
-        task = nil
-        guard let clips = takePending() else { return }
-
-        // Encoding and writing the whole history can mean megabytes; doing it
-        // on the main actor would stutter the menu bar every couple of
-        // seconds. Termination still writes synchronously, above.
-        let save = save
-        let written = await Task.detached(priority: .utility) { save(clips) }.value
-        if !written { restorePending(clips) }
-    }
-
-    private func takePending() -> [Clip]? {
-        guard let clips = pending else { return nil }
+        guard let clips = pending else { return }
         pending = nil
         pendingSince = nil
-        return clips
-    }
 
-    /// A failed write must not be reported as done: keep the change so the
-    /// next one, or termination, tries again.
-    private func restorePending(_ clips: [Clip]) {
-        guard pending == nil else { return }  // a newer change already supersedes it
-        pending = clips
-        pendingSince = ContinuousClock.now
+        // A failed write must not be reported as done: keep the change so the
+        // next one, or termination, tries again.
+        if !save(clips) {
+            pending = clips
+            pendingSince = ContinuousClock.now
+        }
     }
 }

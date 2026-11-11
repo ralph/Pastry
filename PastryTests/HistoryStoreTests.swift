@@ -3,7 +3,8 @@ import Testing
 @testable import Pastry
 
 /// A history file held in memory, so the rules are tested without disk.
-private final class FakeHistoryFile: HistoryFile, @unchecked Sendable {
+@MainActor
+private final class FakeHistoryFile: HistoryFile {
     var data: Data?
     var readError: Error?
     var writeError: Error?
@@ -24,6 +25,7 @@ private final class FakeHistoryFile: HistoryFile, @unchecked Sendable {
 private struct Boom: Error {}
 
 @Suite("HistoryStore")
+@MainActor
 struct HistoryStoreTests {
     @Test("round trips clips through the file")
     func roundTrip() {

@@ -4,7 +4,8 @@ import Foundation
 ///
 /// `load()` never throws. Every way of failing — no file, unreadable file,
 /// damaged contents — means the same thing to the app: start empty.
-struct HistoryStore: Sendable {
+@MainActor
+struct HistoryStore {
     private let file: HistoryFile
 
     init(file: HistoryFile = DiskHistoryFile()) {

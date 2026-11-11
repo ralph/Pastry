@@ -2,7 +2,11 @@ import Foundation
 
 /// Where the history lives. A protocol so the store's rules can be tested
 /// without touching disk.
-protocol HistoryFile: Sendable {
+///
+/// Main-actor isolated, like `ClipboardSource`: writes are deliberately
+/// serialised on one actor so they cannot land out of order.
+@MainActor
+protocol HistoryFile {
     /// The stored bytes, or `nil` when there is no file yet — which is the
     /// ordinary first-launch case, not an error.
     func read() throws -> Data?

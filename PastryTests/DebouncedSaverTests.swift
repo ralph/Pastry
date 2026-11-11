@@ -5,23 +5,20 @@ import Testing
 @Suite("DebouncedSaver")
 @MainActor
 struct DebouncedSaverTests {
-    /// Counts writes and can refuse them, from any isolation.
-    final class Writes: @unchecked Sendable {
-        private let lock = NSLock()
-        private var _saved: [[String]] = []
-        private var _succeed = true
+    /// Counts writes and can refuse them. Writes are serialised on the main
+    /// actor, so this needs no locking.
+    final class Writes {
+        private(set) var saved: [[String]] = []
+        private var succeed = true
 
-        var saved: [[String]] { lock.withLock { _saved } }
-        var count: Int { lock.withLock { _saved.count } }
-        func refuseWrites() { lock.withLock { _succeed = false } }
-        func allowWrites() { lock.withLock { _succeed = true } }
+        var count: Int { saved.count }
+        func refuseWrites() { succeed = false }
+        func allowWrites() { succeed = true }
 
         func record(_ clips: [Clip]) -> Bool {
-            lock.withLock {
-                guard _succeed else { return false }
-                _saved.append(clips.map(\.text))
-                return true
-            }
+            guard succeed else { return false }
+            saved.append(clips.map(\.text))
+            return true
         }
     }
 
@@ -33,7 +30,7 @@ struct DebouncedSaverTests {
         DebouncedSaver(delay: delay, maxDelay: maxDelay) { writes.record($0) }
     }
 
-    /// The write happens on a detached task, so settle rather than sleep for a
+    /// The timer suspends before writing, so settle rather than sleep for a
     /// fixed span — a fixed margin is what makes a suite flaky under load.
     private func settle() async {
         for _ in 0..<200 {
