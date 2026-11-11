@@ -12,24 +12,32 @@ struct PasterTests {
         var trustRequests = 0
     }
 
-    private func makePaster(trusted: Bool, recorder: Recorder) -> Paster {
+    private func makePaster(
+        isTrusted: @escaping () -> Bool,
+        recorder: Recorder,
+        keystrokeSucceeds: Bool = true,
+        delay: Duration = .zero
+    ) -> Paster {
         Paster(
             write: { text in
                 recorder.steps.append("write")
                 recorder.written.append(text)
             },
             yieldFocus: { recorder.steps.append("yieldFocus") },
-            sendPaste: { recorder.steps.append("sendPaste") },
-            isTrusted: { trusted },
+            sendPaste: {
+                recorder.steps.append("sendPaste")
+                return keystrokeSucceeds
+            },
+            isTrusted: isTrusted,
             requestTrust: { recorder.trustRequests += 1 },
-            delay: .zero
+            delay: delay
         )
     }
 
     @Test("writes, yields focus, then sends the keystroke, in that order")
     func pastesInOrder() async {
         let recorder = Recorder()
-        let paster = makePaster(trusted: true, recorder: recorder)
+        let paster = makePaster(isTrusted: { true }, recorder: recorder)
 
         let outcome = await paster.paste("hello")
 
@@ -41,7 +49,7 @@ struct PasterTests {
     @Test("does not ask for permission it already has")
     func doesNotPromptWhenTrusted() async {
         let recorder = Recorder()
-        let paster = makePaster(trusted: true, recorder: recorder)
+        let paster = makePaster(isTrusted: { true }, recorder: recorder)
         await paster.paste("hello")
         #expect(recorder.trustRequests == 0)
     }
@@ -51,7 +59,7 @@ struct PasterTests {
     @Test("still copies the clip when permission is missing")
     func copiesWithoutPermission() async {
         let recorder = Recorder()
-        let paster = makePaster(trusted: false, recorder: recorder)
+        let paster = makePaster(isTrusted: { false }, recorder: recorder)
 
         let outcome = await paster.paste("hello")
 
@@ -62,7 +70,7 @@ struct PasterTests {
     @Test("sends no keystroke without permission")
     func sendsNoKeystrokeWithoutPermission() async {
         let recorder = Recorder()
-        let paster = makePaster(trusted: false, recorder: recorder)
+        let paster = makePaster(isTrusted: { false }, recorder: recorder)
         await paster.paste("hello")
         #expect(!recorder.steps.contains("sendPaste"))
         #expect(!recorder.steps.contains("yieldFocus"))
@@ -71,7 +79,7 @@ struct PasterTests {
     @Test("asks for permission when it is missing")
     func asksForPermission() async {
         let recorder = Recorder()
-        let paster = makePaster(trusted: false, recorder: recorder)
+        let paster = makePaster(isTrusted: { false }, recorder: recorder)
         await paster.paste("hello")
         #expect(recorder.trustRequests == 1)
     }
@@ -81,11 +89,42 @@ struct PasterTests {
     @Test("asks for permission only once per launch")
     func asksOnlyOnce() async {
         let recorder = Recorder()
-        let paster = makePaster(trusted: false, recorder: recorder)
+        let paster = makePaster(isTrusted: { false }, recorder: recorder)
         await paster.paste("one")
         await paster.paste("two")
         await paster.paste("three")
         #expect(recorder.trustRequests == 1)
+    }
+
+    /// A failed keystroke must not be reported as a paste: the user would see
+    /// nothing happen and the log would claim success.
+    @Test("reports a keystroke the event stream refused")
+    func reportsAFailedKeystroke() async {
+        let recorder = Recorder()
+        let paster = makePaster(isTrusted: { true }, recorder: recorder, keystrokeSucceeds: false)
+        #expect(await paster.paste("hello") == .keystrokeFailed)
+    }
+
+    /// Two pastes across the wait would interleave — the first would resume
+    /// after the second replaced the pasteboard and type the second's clip.
+    @Test("refuses a second paste while one is in flight")
+    func refusesOverlappingPaste() async {
+        let recorder = Recorder()
+        let paster = makePaster(
+            isTrusted: { true },
+            recorder: recorder,
+            delay: .milliseconds(50)
+        )
+
+        async let first = paster.paste("A")
+        await Task.yield()
+        let second = await paster.paste("B")
+        let firstOutcome = await first
+
+        #expect(firstOutcome == .pasted)
+        #expect(second == .alreadyPasting)
+        // B never even reached the pasteboard.
+        #expect(recorder.written == ["A"])
     }
 
     /// Permission can be granted in System Settings while Pastry runs, and it
@@ -93,15 +132,8 @@ struct PasterTests {
     @Test("pastes once permission is granted mid-session")
     func noticesPermissionGrantedLater() async {
         let recorder = Recorder()
-        var trusted = false
-        let paster = Paster(
-            write: { recorder.written.append($0) },
-            yieldFocus: { recorder.steps.append("yieldFocus") },
-            sendPaste: { recorder.steps.append("sendPaste") },
-            isTrusted: { trusted },
-            requestTrust: { recorder.trustRequests += 1 },
-            delay: .zero
-        )
+        nonisolated(unsafe) var trusted = false
+        let paster = makePaster(isTrusted: { trusted }, recorder: recorder)
 
         #expect(await paster.paste("before") == .copiedWithoutPermission)
         trusted = true

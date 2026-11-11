@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenu: StatusMenu?
     private(set) var store = ClipStore()
     private(set) var monitor: ClipboardMonitor?
-    private var paster: Paster?
+    private(set) var paster: Paster?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppEnvironment.isRunningTests else { return }
@@ -47,8 +47,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.start()
         self.monitor = monitor
         // Pastes are written through the monitor so the clip Pastry puts on
-        // the pasteboard is not captured straight back as a new one.
-        paster = Paster(write: { [weak monitor] text in monitor?.write(text) })
+        // the pasteboard is not captured straight back as a new one. Captured
+        // strongly: this delegate owns both for the process lifetime, so there
+        // is no cycle, and a nil monitor would mean pasting stale text.
+        paster = Paster(write: { text in monitor.write(text) })
     }
 
     /// Pastes a chosen clip into the application the user came from.
@@ -57,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { [weak self] in
             guard let outcome = await self?.paster?.paste(clip.text) else { return }
             Log.clipboard.info(
-                "chose a clip of \(clip.text.utf8.count) bytes: \(String(describing: outcome), privacy: .public)"
+                "chose a clip of \(clip.text.utf8.count) bytes: \(outcome.rawValue, privacy: .public)"
             )
         }
     }
