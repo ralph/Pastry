@@ -10,11 +10,19 @@ real `.icon` bundle is produced from the same geometry.
 
 A simplified side view of a layer-cake slice, taken from a reference photo of a
 pineapple-coconut slice: thick frosting cap, sponge, cream with fruit through
-it, sponge, and a cherry on top. Beside it, a pair of scissors seen from the
-side at an angle — drawn in the spirit of the scissors emoji (wide blades,
-two handle loops), but original geometry, not a trace of it.
+it, sponge, and a cherry on top. To its left, a pair of scissors seen from the
+side — drawn in the spirit of the classic scissors glyph, but original
+geometry, not a trace of it.
 
-Direction: light ground, colourful garnish, dark scissors for contrast.
+Layout: scissors left, garnish right. Light ground, colourful garnish, and the
+scissors in a single flat metal or black — no coloured handles.
+
+The scissors are built the way real scissors are, which is what makes them read
+as scissors rather than as shears: **each arm is one continuous piece running
+from its loop, through the pivot, to the blade on the *opposite* side.** That
+crossing is what produces the pinched waist and the open wedge between the
+blades. An earlier version hinged two separate blades at a point and read as
+surgical shears instead.
 
 ## Files
 
@@ -44,12 +52,24 @@ re-proportioned by changing a number instead of dragging control points:
 
 - `cake(x0, x1, ytop, ybot)` — the slice. Band thicknesses are fractions of the
   total height, so the whole slice rescales as one.
-- `scissors(pivot, deg, blade_len, arm_len, loop_r, spread)` — built along a
-  local +x axis running pivot → handles, blades along −x, then rotated into
-  place by `xform`. Change `deg` to re-angle the whole tool.
-- `blade_shape` — one blade: wide at the pivot, straight inner cutting edge,
-  rounded point. Deliberately chunky; thin blades disappear below 64 pt.
+- `scissors(pivot, deg, scale)` — built along a local +x axis with the loops at
+  −x and the blades at +x, then rotated and scaled into place by `xform`.
+  Change `deg` to re-angle the whole tool, `scale` to resize it.
 - `round_poly`, `taper`, `ring`, `circle` — the primitives those are made of.
+
+Two things in here are easy to get wrong and were both real bugs:
+
+- **`taper`'s end cap must use sweep-flag 0, never 1.** The cap's normal is
+  always the left normal of the travel direction, so the sweep is constant; a
+  hardcoded `1` makes the cap bite *into* the shape instead of rounding it off.
+  Invisible on thin limbs, a gaping crescent on thick ones.
+- **Render with the nonzero fill rule, not even-odd.** A scissor arm is a neck
+  and a blade that deliberately overlap; under even-odd the overlap cancels to
+  a hole. `ring()` winds its inner circle backwards, so nonzero still hollows
+  the loops correctly.
+
+`scissors()` returns its rings and its body as **separate paths** for the same
+reason: they overlap, and one combined path would cancel itself.
 
 Coordinates are emitted on the **1024×1024** canvas Icon Composer expects, so
 the generated paths drop straight into layer SVGs unmodified.
@@ -91,9 +111,13 @@ specialization on the scissors plus one on the background.
 | Stem | `#4E7F3C` | same |
 | Scissors | `#332E3B` | `#A7AFC4` |
 
+The scissors are one flat tone — no separately coloured handles.
+
 The dark-appearance scissors are deliberately mid-slate rather than near-white:
 they have to read against the dark ground *and* against the white frosting they
-cross. Near-white blades vanish on the frosting.
+cross. Near-white blades vanish on the frosting, and black vanishes into the
+ground. That squeeze is why the default and dark tones are so far apart while
+nothing else in the icon changes at all.
 
 Grounds are gradients declared in `icon.json`, not artwork. Four are drawn up
 (`COLORWAYS` in `concepts.py`): rose, vanilla, mint, sky.

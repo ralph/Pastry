@@ -10,7 +10,7 @@ def tile(c, mode, size, x, y, uid):
     defs.append(f'<clipPath id="cp{uid}"><path d="{d["squircle"]}"/></clipPath>')
     defs.append(f'<linearGradient id="bg{uid}" x1="0" y1="0" x2="0" y2="1">'
                 f'<stop offset="0" stop-color="{bg[0]}"/><stop offset="1" stop-color="{bg[1]}"/></linearGradient>')
-    ls = "".join(f'<path d="{l["d"]}" fill="{l[mode]}" fill-rule="evenodd" opacity="{l["opacity"]}"/>'
+    ls = "".join(f'<path d="{l["d"]}" fill="{l[mode]}" opacity="{l["opacity"]}"/>'
                  for l in reversed(c['layers']))
     return (f'<g transform="translate({x:.2f},{y:.2f}) scale({s:.6f})" clip-path="url(#cp{uid})">'
             f'<rect width="1024" height="1024" fill="url(#bg{uid})"/>{ls}</g>')
