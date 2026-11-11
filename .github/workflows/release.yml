@@ -198,15 +198,18 @@ jobs:
           key="$RUNNER_TEMP/key.p8"
           trap 'rm -f "$key"' EXIT
           printf '%s' "$KEY" | base64 --decode > "$key"
-          # The submission id is captured rather than left in --wait's output,
-          # so the log can be fetched on refusal while the key still exists.
-          id="$(xcrun notarytool submit "$DMG" --key "$key" --key-id "$KEY_ID" \
-                  --issuer "$ISSUER_ID" --output-format json \
-                  | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
-          echo "submission $id"
-          if ! xcrun notarytool wait "$id" --key "$key" --key-id "$KEY_ID" \
-                 --issuer "$ISSUER_ID" --timeout 30m; then
-            echo "::error::Notarization was refused. Apple's reasons follow."
+          # The verdict is read from the status, never from the exit code:
+          # notarytool exits 0 whenever it successfully waited, including
+          # when Apple's answer is Invalid. Keying off the exit code lets a
+          # rejected submission fall through to stapling, which then fails
+          # with an unrelated CloudKit error.
+          result="$(xcrun notarytool submit "$DMG" --key "$key" --key-id "$KEY_ID" \
+                      --issuer "$ISSUER_ID" --wait --timeout 30m --output-format json)"
+          id="$(printf '%s' "$result" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
+          status="$(printf '%s' "$result" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')"
+          echo "submission $id -> $status"
+          if [ "$status" != "Accepted" ]; then
+            echo "::error::Notarization returned $status. Apple's reasons follow."
             xcrun notarytool log "$id" --key "$key" --key-id "$KEY_ID" \
               --issuer "$ISSUER_ID" || true
             exit 1
