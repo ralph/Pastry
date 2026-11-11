@@ -53,9 +53,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.load(history.load())
 
         let saver = DebouncedSaver { [history] clips in history.save(clips) }
-        store.onChange = { [weak self, weak saver] in
+        store.onChange = { [weak self, weak saver] urgency in
             guard let self, let saver else { return }
             saver.schedule(self.store.clips)
+            // Deleting is meant to take effect now, not at the next quiet
+            // moment: a force quit in between would bring the clips back.
+            if urgency == .immediate { saver.flush() }
         }
         self.saver = saver
         Log.clipboard.info("restored \(self.store.count) clips from disk")

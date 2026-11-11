@@ -192,15 +192,20 @@ struct ClipStoreTests {
 
 ||||||| parent of d472a88 (Persist the clipboard history)
     @Test("announces every change to the list", arguments: [
-        "add", "remove", "clear", "merge", "moveToTop", "rememberCount",
+        ("add", ClipStore.Urgency.routine),
+        ("remove", .immediate),
+        ("clear", .immediate),
+        ("merge", .routine),
+        ("moveToTop", .routine),
+        ("rememberCount", .routine),
     ])
-    func announcesChanges(mutation: String) {
+    func announcesChanges(mutation: String, expected: ClipStore.Urgency) {
         let store = ClipStore()
         store.add(Clip.fixture("seed one"))
         store.add(Clip.fixture("seed two"))
 
-        var changes = 0
-        store.onChange = { changes += 1 }
+        var announced: [ClipStore.Urgency] = []
+        store.onChange = { announced.append($0) }
 
         switch mutation {
         case "add": store.add(Clip.fixture("another"))
@@ -212,7 +217,31 @@ struct ClipStoreTests {
         default: Issue.record("unknown mutation \(mutation)")
         }
 
-        #expect(changes == 1)
+        #expect(announced == [expected])
+    }
+
+    /// A change that was rejected is not a change. Announcing one would
+    /// schedule a whole-history write on, for instance, every pasteboard poll
+    /// that turned out to hold nothing worth keeping.
+    @Test("stays silent when a mutation changes nothing", arguments: [
+        "whitespace", "removeOutOfRange", "moveAbsent", "mergeSingle",
+    ])
+    func staysSilentWhenNothingChanges(mutation: String) {
+        let store = ClipStore()
+        store.add(Clip.fixture("only"))
+
+        var changes = 0
+        store.onChange = { _ in changes += 1 }
+
+        switch mutation {
+        case "whitespace": store.add(Clip.fixture("   \n  "))
+        case "removeOutOfRange": store.remove(at: 9)
+        case "moveAbsent": store.moveToTop(Clip.fixture("never added"))
+        case "mergeSingle": store.merge()
+        default: Issue.record("unknown mutation \(mutation)")
+        }
+
+        #expect(changes == 0)
     }
 
     /// Loading is not a change worth writing straight back to disk.
@@ -220,7 +249,7 @@ struct ClipStoreTests {
     func loadIsNotAChange() {
         let store = ClipStore()
         var changes = 0
-        store.onChange = { changes += 1 }
+        store.onChange = { _ in changes += 1 }
         store.load([Clip.fixture("from disk")])
         #expect(changes == 0)
         #expect(store.clips.map(\.text) == ["from disk"])

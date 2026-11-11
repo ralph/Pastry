@@ -5,98 +5,158 @@ import Testing
 @Suite("DebouncedSaver")
 @MainActor
 struct DebouncedSaverTests {
-    final class Recorder { var saves: [[String]] = [] }
+    /// Counts writes and can refuse them, from any isolation.
+    final class Writes: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _saved: [[String]] = []
+        private var _succeed = true
 
-    private func makeSaver(
-        delay: Duration = .milliseconds(50),
-        recorder: Recorder
-    ) -> DebouncedSaver {
-        DebouncedSaver(delay: delay) { clips in
-            recorder.saves.append(clips.map(\.text))
+        var saved: [[String]] { lock.withLock { _saved } }
+        var count: Int { lock.withLock { _saved.count } }
+        func refuseWrites() { lock.withLock { _succeed = false } }
+        func allowWrites() { lock.withLock { _succeed = true } }
+
+        func record(_ clips: [Clip]) -> Bool {
+            lock.withLock {
+                guard _succeed else { return false }
+                _saved.append(clips.map(\.text))
+                return true
+            }
         }
     }
 
-    @Test("does not save straight away")
-    func doesNotSaveImmediately() {
-        let recorder = Recorder()
-        let saver = makeSaver(recorder: recorder)
-        saver.schedule([Clip.fixture("a")])
-        #expect(recorder.saves.isEmpty)
+    private func makeSaver(
+        delay: Duration = .zero,
+        maxDelay: Duration = .seconds(10),
+        writes: Writes
+    ) -> DebouncedSaver {
+        DebouncedSaver(delay: delay, maxDelay: maxDelay) { writes.record($0) }
     }
 
-    @Test("saves once the delay has passed")
-    func savesAfterTheDelay() async throws {
-        let recorder = Recorder()
-        let saver = makeSaver(recorder: recorder)
-        saver.schedule([Clip.fixture("a")])
-        try await Task.sleep(for: .milliseconds(300))
-        #expect(recorder.saves == [["a"]])
+    /// The write happens on a detached task, so settle rather than sleep for a
+    /// fixed span — a fixed margin is what makes a suite flaky under load.
+    private func settle() async {
+        for _ in 0..<200 {
+            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(1))
+        }
     }
 
-    /// Copying several things in quick succession should cost one write, not
-    /// one per clip.
-    @Test("collapses a burst into a single save of the latest clips")
-    func collapsesABurst() async throws {
-        let recorder = Recorder()
-        let saver = makeSaver(recorder: recorder)
+    @Test("does not write synchronously")
+    func doesNotWriteSynchronously() {
+        let writes = Writes()
+        makeSaver(writes: writes).schedule([Clip.fixture("a")])
+        #expect(writes.count == 0)
+    }
+
+    @Test("writes once the delay has passed")
+    func writesAfterTheDelay() async {
+        let writes = Writes()
+        let saver = makeSaver(writes: writes)
+        saver.schedule([Clip.fixture("a")])
+        await settle()
+        #expect(writes.saved == [["a"]])
+    }
+
+    /// Copying several things in quick succession should cost one write.
+    @Test("collapses a burst into a single write of the latest clips")
+    func collapsesABurst() async {
+        let writes = Writes()
+        let saver = makeSaver(delay: .milliseconds(80), writes: writes)
 
         saver.schedule([Clip.fixture("a")])
         saver.schedule([Clip.fixture("b")])
         saver.schedule([Clip.fixture("c")])
-        try await Task.sleep(for: .milliseconds(300))
+        await settle()
 
-        #expect(recorder.saves == [["c"]])
+        #expect(writes.saved == [["c"]])
     }
 
-    @Test("flush writes a pending save at once")
+    /// Without a cap, changes arriving faster than the delay reset the timer
+    /// forever and nothing is ever written — a crash would then cost the whole
+    /// session, which is the one thing this is meant to prevent.
+    @Test("writes anyway once the maximum wait is reached")
+    func writesDespiteContinuousChanges() async {
+        let writes = Writes()
+        let saver = makeSaver(delay: .seconds(60), maxDelay: .milliseconds(50), writes: writes)
+
+        // Each of these would reset a plain debounce.
+        for index in 0..<5 {
+            saver.schedule([Clip.fixture("change \(index)")])
+            try? await Task.sleep(for: .milliseconds(15))
+        }
+        await settle()
+
+        #expect(writes.count >= 1)
+        #expect(writes.saved.last == ["change 4"])
+    }
+
+    @Test("flush writes a pending change at once")
     func flushWritesPending() {
-        let recorder = Recorder()
-        let saver = makeSaver(delay: .seconds(60), recorder: recorder)
+        let writes = Writes()
+        let saver = makeSaver(delay: .seconds(60), writes: writes)
         saver.schedule([Clip.fixture("a")])
         saver.flush()
-        #expect(recorder.saves == [["a"]])
+        #expect(writes.saved == [["a"]])
     }
 
-    /// Termination calls flush; a second write would mean the pending state
-    /// leaked rather than being consumed.
     @Test("flush does not write again once there is nothing pending")
     func flushIsIdempotent() {
-        let recorder = Recorder()
-        let saver = makeSaver(delay: .seconds(60), recorder: recorder)
+        let writes = Writes()
+        let saver = makeSaver(delay: .seconds(60), writes: writes)
         saver.schedule([Clip.fixture("a")])
         saver.flush()
         saver.flush()
-        #expect(recorder.saves.count == 1)
+        #expect(writes.count == 1)
     }
 
     @Test("flush with nothing pending writes nothing")
     func flushWithoutPending() {
-        let recorder = Recorder()
-        makeSaver(recorder: recorder).flush()
-        #expect(recorder.saves.isEmpty)
+        let writes = Writes()
+        makeSaver(writes: writes).flush()
+        #expect(writes.count == 0)
     }
 
-    @Test("a save after a flush still works")
+    @Test("a change after a flush still writes")
     func scheduleAfterFlush() {
-        let recorder = Recorder()
-        let saver = makeSaver(delay: .seconds(60), recorder: recorder)
+        let writes = Writes()
+        let saver = makeSaver(delay: .seconds(60), writes: writes)
         saver.schedule([Clip.fixture("a")])
         saver.flush()
         saver.schedule([Clip.fixture("b")])
         saver.flush()
-        #expect(recorder.saves == [["a"], ["b"]])
+        #expect(writes.saved == [["a"], ["b"]])
     }
 
-    /// A pending write must not be lost when a later change supersedes it:
-    /// the later clips are what gets written, not nothing.
-    @Test("a superseded save does not write the earlier clips")
-    func supersededSaveIsDiscarded() async throws {
-        let recorder = Recorder()
-        let saver = makeSaver(recorder: recorder)
-        saver.schedule([Clip.fixture("first")])
-        try await Task.sleep(for: .milliseconds(10))
-        saver.schedule([Clip.fixture("second")])
-        try await Task.sleep(for: .milliseconds(300))
-        #expect(recorder.saves == [["second"]])
+    /// A write that failed must not be reported as done, or the change is
+    /// lost with nothing but a log line.
+    @Test("keeps a change whose write failed")
+    func keepsAFailedWrite() {
+        let writes = Writes()
+        let saver = makeSaver(delay: .seconds(60), writes: writes)
+        writes.refuseWrites()
+
+        saver.schedule([Clip.fixture("a")])
+        saver.flush()
+        #expect(writes.count == 0)
+
+        writes.allowWrites()
+        saver.flush()
+        #expect(writes.saved == [["a"]])
+    }
+
+    @Test("a failed write is superseded by a newer change rather than resurrected")
+    func failedWriteDoesNotOverrideNewerClips() {
+        let writes = Writes()
+        let saver = makeSaver(delay: .seconds(60), writes: writes)
+        writes.refuseWrites()
+        saver.schedule([Clip.fixture("old")])
+        saver.flush()
+
+        writes.allowWrites()
+        saver.schedule([Clip.fixture("new")])
+        saver.flush()
+
+        #expect(writes.saved == [["new"]])
     }
 }

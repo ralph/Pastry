@@ -4,7 +4,7 @@ import Foundation
 ///
 /// `load()` never throws. Every way of failing — no file, unreadable file,
 /// damaged contents — means the same thing to the app: start empty.
-struct HistoryStore {
+struct HistoryStore: Sendable {
     private let file: HistoryFile
 
     init(file: HistoryFile = DiskHistoryFile()) {
@@ -23,11 +23,16 @@ struct HistoryStore {
         }
     }
 
-    func save(_ clips: [Clip]) {
+    /// Returns whether the history reached disk. A failed write must not be
+    /// reported as done, or the change is lost with only a log line.
+    @discardableResult
+    func save(_ clips: [Clip]) -> Bool {
         do {
             try file.write(try JSONEncoder().encode(clips))
+            return true
         } catch {
             Log.clipboard.error("could not write the history: \(error)")
+            return false
         }
     }
 }

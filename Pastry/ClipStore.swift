@@ -10,9 +10,19 @@ import Foundation
 final class ClipStore {
     private(set) var clips: [Clip] = []
 
+    /// How soon a change needs to reach disk.
+    enum Urgency {
+        /// Can wait for a quiet moment.
+        case routine
+        /// Must be written now. Removing clips is the user deleting
+        /// something; leaving it in a buffer means a crash or a force quit in
+        /// the next couple of seconds brings it back.
+        case immediate
+    }
+
     /// Fires after any change to the list, so the history can be written.
     /// Not fired by `load(_:)`, which is where the list came from.
-    var onChange: (() -> Void)?
+    var onChange: ((Urgency) -> Void)?
 
     /// How many clips to keep. Lowering it discards the oldest immediately.
     ///
@@ -23,7 +33,7 @@ final class ClipStore {
         didSet {
             rememberCount = max(0, rememberCount)
             trim()
-            onChange?()
+            onChange?(.routine)
         }
     }
 
@@ -59,13 +69,13 @@ final class ClipStore {
         clips.removeAll { $0.text == clip.text }
         clips.insert(clip, at: 0)
         trim()
-        onChange?()
+        onChange?(.routine)
     }
 
     func remove(at index: Int) {
         guard clip(at: index) != nil else { return }
         clips.remove(at: index)
-        onChange?()
+        onChange?(.immediate)
     }
 
     /// Moves a clip already in the history to the top, keeping its source app
@@ -80,12 +90,12 @@ final class ClipStore {
         guard let index = clips.firstIndex(where: { $0.text == clip.text }) else { return }
         let existing = clips.remove(at: index)
         clips.insert(existing, at: 0)
-        onChange?()
+        onChange?(.routine)
     }
 
     func clear() {
         clips.removeAll()
-        onChange?()
+        onChange?(.immediate)
     }
 
     /// Replaces the history with what was read from disk.

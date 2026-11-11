@@ -36,18 +36,30 @@ struct DiskHistoryFile: HistoryFile {
     }
 
     func write(_ data: Data) throws {
+        // The directory is owner-only, which is what actually protects the
+        // history: an atomic write creates a temporary file with default
+        // permissions and renames it into place, so the file itself is
+        // briefly group- and world-readable on every single write.
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
-            withIntermediateDirectories: true
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
         )
         // Atomic, so a crash mid-write cannot leave a half-written history.
         try data.write(to: url, options: [.atomic])
-        // This file holds clipboard contents; keep it to the owner. Set after
-        // the write, because an atomic write replaces the file and with it any
-        // permissions the previous one carried.
-        try FileManager.default.setAttributes(
-            [.posixPermissions: 0o600],
-            ofItemAtPath: url.path(percentEncoded: false)
-        )
+
+        // Belt and braces on top of the directory. Applied after the write,
+        // because the atomic rename replaces the file and any permissions the
+        // previous one carried. Deliberately not fatal: the data is on disk,
+        // and reporting a failed write here would make the caller retry a
+        // write that actually succeeded.
+        do {
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: url.path(percentEncoded: false)
+            )
+        } catch {
+            Log.clipboard.error("history written but could not be restricted: \(error)")
+        }
     }
 }
