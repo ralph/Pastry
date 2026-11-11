@@ -36,12 +36,12 @@ final class Preferences {
 
     var rememberCount: Int {
         get { storedRememberCount }
-        set { assign(&storedRememberCount, to: newValue, key: Key.rememberCount) }
+        set { assign(newValue, to: \.storedRememberCount, key: Key.rememberCount) }
     }
 
     var displayCount: Int {
         get { storedDisplayCount }
-        set { assign(&storedDisplayCount, to: newValue, key: Key.displayCount) }
+        set { assign(newValue, to: \.storedDisplayCount, key: Key.displayCount) }
     }
 
     /// Whether Pastry starts at login.
@@ -109,13 +109,24 @@ final class Preferences {
     /// Clamping here rather than at the call site because the call sites that
     /// can produce an out-of-range value are `defaults write` from a shell and
     /// a later caller — the stepper is already bound to the range.
-    private func assign(_ stored: inout Int, to newValue: Int, key: String) {
+    ///
+    /// Takes a key path rather than the property `inout`. An `inout` write
+    /// back only lands when this returns, so `onChange` would run while the
+    /// property still held the old value — and because the handler reads it
+    /// back, the two overlapping accesses trap: "Fatal access conflict
+    /// detected", on every settings change. A key path writes through at the
+    /// assignment, before anything is announced.
+    private func assign(
+        _ newValue: Int,
+        to keyPath: ReferenceWritableKeyPath<Preferences, Int>,
+        key: String
+    ) {
         let clamped = Self.clamp(newValue)
         // Compared after clamping, so a write of 1000 to a count already at
         // the ceiling announces nothing. Otherwise holding a stepper at its
         // limit would re-trim the history and schedule a disk write per tick.
-        guard clamped != stored else { return }
-        stored = clamped
+        guard clamped != self[keyPath: keyPath] else { return }
+        self[keyPath: keyPath] = clamped
         defaults.set(clamped, forKey: key)
         onChange?()
     }

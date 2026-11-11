@@ -39,7 +39,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ///
     /// First, because the history is trimmed to the remember count as it is
     /// restored and the menu is built with the display count.
-    @discardableResult
     private func installPreferences() -> Preferences {
         let preferences = Preferences(loginItem: SystemLoginItem())
         preferences.applyDefaultLoginItemOnce()

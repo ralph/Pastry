@@ -86,6 +86,20 @@ struct PreferencesTests {
         #expect(changes == 1)
     }
 
+    /// What the app does in `onChange` is read the value back. If the write
+    /// had not landed by then, every settings change would be applied one
+    /// step late — the store would be trimmed to the count before last.
+    @Test("has the new value in place before it announces it")
+    func announcesAfterTheValueLands() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        var seen: [Int] = []
+        preferences.onChange = { seen.append(preferences.rememberCount) }
+
+        preferences.rememberCount = 10
+        preferences.rememberCount = 7
+        #expect(seen == [10, 7])
+    }
+
     /// Compared after clamping, not before. Otherwise holding a stepper at
     /// its limit would re-trim the history and schedule a disk write on
     /// every tick that moved nothing.

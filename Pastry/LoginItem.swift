@@ -21,9 +21,11 @@ protocol LoginItem {
 struct SystemLoginItem: LoginItem {
     private var service: SMAppService { .mainApp }
 
-    // Read from the system every time rather than cached: the user can turn
-    // Pastry off in System Settings, and a remembered boolean would then show
-    // a toggle that disagrees with what actually happens at login.
+    // Always asks the system, never remembers: the user can turn Pastry off
+    // in System Settings, so only the system knows. Each call is a
+    // synchronous round trip to smd of about a millisecond, which is why
+    // Preferences keeps a mirror and refreshes it at the few moments the
+    // answer can have changed, rather than calling this per redraw.
     var isEnabled: Bool { service.status == .enabled }
     var needsApproval: Bool { service.status == .requiresApproval }
 
