@@ -1,7 +1,7 @@
 # What stands between Pastry and the App Store
 
-The metadata is ready. The binary is not, but less stands in the way than it
-looked. This is what was verified, and what is left.
+The metadata is ready. The binary is not, but much less stands in the way than
+it looked. This is what was verified, and what is left.
 
 ## The Mac App Store requires the App Sandbox
 
@@ -12,28 +12,50 @@ Store channel entirely".
 
 So this is a decision being reversed rather than an oversight to patch.
 
-## Pasting works under the sandbox — verified
+## Pasting works under the sandbox — verified twice over
 
 This was the open question, and the one that could have killed the whole idea:
 Pastry's core feature is synthesising ⌘V with `CGEvent` (`Keystroke.swift`)
 after checking `AXIsProcessTrusted` (`Accessibility.swift`), and it was not
 obvious that a sandboxed process would be allowed to.
 
-It is. A sandboxed build at
+**By test.** A sandboxed build at
 `/tmp/pastry-sb/Build/Products/Release/Pastry.app`, with a fresh Accessibility
 grant, pasted into TextEdit on the global hotkey. The control run — the same
-gesture with Pastry stopped — left the document empty, which rules out
-⇧⌘V being handled by TextEdit itself.
+gesture with Pastry stopped — left the document empty, ruling out ⇧⌘V being
+handled by TextEdit itself.
+
+**By precedent, in this repository's own history.** Flycut ships on the Mac
+App Store (`id442160987`), and the code that shipped is in this repo. Its App
+Store build was sandboxed (`Flycut.entitlements`,
+`com.apple.security.app-sandbox`), and `-fakeCommandV` posts the same
+`CGEventPost(kCGHIDEventTap, …)` events Pastry does, with no sandbox guard at
+either call site. `FlycutDeveloperID.entitlements` even states the principle
+outright: *Accessibility (for synthesizing paste) is governed by TCC, not
+entitlements.*
 
 Also confirmed working sandboxed: the global hotkey (`RegisterEventHotKey`
 needs no Accessibility and is not sandbox-restricted), the bezel, clipboard
 capture, and persistence into the container.
 
-One caveat worth recording, because it cost a lot of time: a TCC Accessibility
-grant is bound to the binary at the granted path. Replacing the app bundle at
-that path — swapping in a different build to compare — silently invalidates the
+One caveat worth recording, because it cost an hour: a TCC Accessibility grant
+is bound to the binary at the granted path. Replacing the app bundle at that
+path — swapping in a different build to compare — silently invalidates the
 grant while the toggle still appears to be on. Several negative results came
 from that rather than from the sandbox, and were wrong.
+
+## Why Pastry's entitlements are shorter than Flycut's
+
+Flycut's App Store entitlements carry four keys Pastry does not need:
+
+| Flycut key | Why Pastry omits it |
+| --- | --- |
+| `developer.icloud-*`, `aps-environment` | Pastry has no sync. The spec dropped it. |
+| `security.files.user-selected.read-write` | Flycut's save-clippings `NSSavePanel`. Pastry has no such feature. |
+| `security.automation.apple-events` + System Events exception | Flycut's login-item helper drove System Events. Pastry uses `SMAppService`, which needs no Apple Events. |
+
+`com.apple.security.app-sandbox` alone is the whole file, and the test says
+that is sufficient.
 
 ## The history moves into a container
 
@@ -44,12 +66,12 @@ appear to lose their history, and if both builds ship they are two separate
 histories on the same Mac. This needs a decision, not code — either migrate on
 first sandboxed launch, or accept the split and say so.
 
-## Review risk is the remaining unknown
+## Review risk
 
 An app whose core function is driving another application's paste command is
-the kind of thing App Review takes a view on. That view cannot be predicted
-from here. Other clipboard managers do ship on the store, which is
-encouraging but not an answer.
+the kind of thing App Review takes a view on, and that view cannot be
+predicted from here. But Flycut passed review doing exactly this, from this
+code, so the risk is a good deal smaller than it first looked.
 
 ## What is left to do
 
