@@ -138,9 +138,12 @@ favorites bookkeeping; SwiftUI and the menu observe it directly.
 
 ### 5.3 `ClipboardMonitor`
 
-Polls `NSPasteboard.general.changeCount` every 0.5 s. The timer is scheduled in
-`.common` run-loop mode so polling continues while the status menu is open —
-without this, a clipping arriving while the menu is open is missed.
+Polls `NSPasteboard.general.changeCount` every 0.5 s from a `Task` loop rather
+than an `NSTimer`. Main-actor work drains on the main queue, which keeps running
+while a menu is tracking, so a clipping that arrives with the status menu open is
+still seen — the case `.common` run-loop modes existed to solve for the timer.
+The task also ends itself if the monitor is released without `stop()`, which a
+nonisolated `deinit` cannot do for a non-Sendable `Timer` under Swift 6.
 
 Skips a change when:
 - the pasteboard carries `org.nspasteboard.ConcealedType` (the marker password
@@ -156,8 +159,11 @@ mechanism available.
 
 ### 5.4 `Paster`
 
-1. Writes the clip's text to the general pasteboard and records the resulting
-   change count so the monitor ignores it.
+1. Writes the clip's text to the pasteboard through `ClipboardMonitor.write(_:)`,
+   which is a single operation: the write returns the change count it produced
+   and the monitor records it, so the clip cannot be captured back. This is
+   deliberately **not** "write, then suppress" as two calls — that contract can
+   be forgotten, and a copy the user makes between the two steps is swallowed.
 2. Dismisses whatever UI is showing and yields focus back to the previously
    frontmost app.
 3. After a short delay, synthesizes ⌘V with `CGEventPost`, using the **key code**
@@ -407,6 +413,12 @@ replacement is built.
 - **Paste timing.** The delays between hiding the UI, focus returning and
   posting ⌘V are empirical. Flycut uses 0.2 s; keep that unless testing shows
   otherwise.
+- **History memory is capped by count, not by size.** Forty clips of
+  multi-megabyte pasted text is a few hundred megabytes resident for the life
+  of an all-day agent, and nothing evicts it. Matches Flycut, so it is the
+  status quo rather than a regression, and no byte budget is implemented. Worth
+  revisiting if it bites; a size cap would change observable behaviour and so
+  is the user's call, not a silent default.
 
 ## 14. Non-goals
 
