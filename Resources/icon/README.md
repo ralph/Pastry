@@ -5,8 +5,9 @@ Sources for the Pastry app bundle icon. This is **not** the menu-bar glyph
 
 The built bundle lives next to this folder at **`Resources/Pastry.icon`**.
 
-Status: **design chosen and built.** Angled composition, rose ground, charcoal
-scissors. Not yet wired into the Xcode target — that is feature 10.
+Status: **design chosen, built, and confirmed in Icon Composer.** Angled
+composition, rose ground, charcoal scissors. Not yet wired into the Xcode
+target — that is feature 10.
 
 ## The design
 
@@ -153,25 +154,41 @@ bundles on this machine (Xcode 27.2):
 - Six appearances exist (default, dark, clear light/dark, tinted light/dark).
   Only **default and dark** are authored; macOS generates the rest.
 
-## What is verified, and what is not
+## What is verified
 
-Verified here, mechanically:
-
-- `icon.json` is valid JSON; every `image-name` resolves to a file.
+- `icon.json` is valid JSON; every `image-name` resolves to a file, with no
+  orphan assets, and no group exceeds the four-layer limit.
 - Every layer SVG parses as XML and is a full `0 0 1024 1024` canvas.
 - The bundle composites correctly **from its own files** — `preview_icon.py`
   reads the manifest and the SVGs, not the generator.
-- macOS identifies the bundle as `com.apple.iconcomposer.icon`
+- macOS identifies it as `com.apple.iconcomposer.icon`
   (`mdls -name kMDItemContentType Resources/Pastry.icon`), the same content
-  type as an Icon Composer bundle authored in the GUI.
+  type as a GUI-authored bundle.
+- **It opens in Icon Composer and renders correctly** — all four groups and
+  ten layers appear with the right names and nesting, every fill applies, and
+  the Liquid Glass render looks right.
+- **It round-trips through the GUI byte-identically.** Saving from Icon
+  Composer and re-running `build_icon.py` produce the same file. This is why
+  `build_icon.py` writes Icon Composer's exact JSON style (two-space indent,
+  sorted keys, a space either side of the colon, no trailing newline) and
+  omits the gradient `orientation` — Icon Composer strips an explicit
+  top-to-bottom orientation because that is already the default.
 
-**Not** verified, and needing a human with Icon Composer open:
+The one thing a GUI save adds that the generator does not is `"hidden": false`
+on a layer whose visibility was toggled. It is a redundant default and
+regenerating drops it again; harmless either way.
 
-- How it looks under the real Liquid Glass material — specular highlights,
-  refraction, the `glass` flag per layer, and whether `translucency` 0.12 on
-  the cake is too much or too little. Those values are a conservative first
-  pass, meant to be dialled by eye.
-- The system-generated **clear** and **tinted** appearances.
+## Still worth a human eye
+
+The `glass` flags and the `translucency` values (0.12 on Topping and Sponge,
+off elsewhere) are a conservative first pass chosen to be predictable, not
+tuned. So are the specular settings. If they want adjusting, change them in
+`build_icon.py` rather than the GUI, or change them in the GUI and port the
+numbers back — otherwise the next `build_icon.py` run overwrites them.
+
+The system-generated **clear** and **tinted** appearances have not been looked
+at closely. The thing to check is that the scissors survive, since they are the
+only element carrying a dark specialization.
 
 Icon Composer is GUI-only — it ships inside Xcode at
 `Xcode.app/Contents/Applications/Icon Composer.app` and there is no

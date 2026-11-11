@@ -38,10 +38,10 @@ def srgb(hex_colour, alpha=1.0):
 
 
 def gradient(top, bottom):
-    return {
-        "linear-gradient": [srgb(top), srgb(bottom)],
-        "orientation": {"start": {"x": 0.5, "y": 0}, "stop": {"x": 0.5, "y": 1}},
-    }
+    # No "orientation": top-to-bottom is the default, and Icon Composer strips
+    # an explicit one on save. Omitting it keeps the file byte-identical across
+    # a round trip through the GUI.
+    return {"linear-gradient": [srgb(top), srgb(bottom)]}
 
 
 SVG = ('<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" '
@@ -149,8 +149,17 @@ def build():
         "groups": groups,
         "supported-platforms": {"circles": ["watchOS"], "squares": "shared"},
     }
+    # Icon Composer's own formatting: two-space indent, keys sorted, and a
+    # space either side of the colon. Matching it means re-saving from the GUI
+    # produces no diff, so hand edits there and regeneration here stay legible
+    # against each other.
+    # No trailing newline, because Icon Composer does not write one. Matching
+    # the GUI byte-for-byte matters more here than the usual POSIX habit: the
+    # GUI is what gets opened to tune glass and translucency, so it is the tool
+    # that will rewrite this file most often.
     (BUNDLE / "icon.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        json.dumps(manifest, indent=2, sort_keys=True, separators=(",", " : ")),
+        encoding="utf-8")
 
     rel = os.path.relpath(BUNDLE, HERE.parent.parent)
     print(f"wrote {rel}/icon.json and {len(written)} layers in {rel}/Assets/")
