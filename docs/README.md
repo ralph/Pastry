@@ -29,3 +29,8 @@ expected to fight back — which is usually the most accurate part.
 
 The `For agentic workers` line at the top of each plan is addressed to the
 tooling that executed it and can be ignored.
+
+The plans say `master` throughout, because that is what the default branch
+was called while the work was done. It was renamed to `main` afterwards. The
+plans are left as they were written rather than edited to match — a record
+that has been tidied up after the fact is worth less than one that has not.

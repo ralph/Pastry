@@ -19,7 +19,7 @@ The workflow can be run by hand. It builds, signs and notarizes exactly as a
 tag would, but publishes nothing:
 
 ```bash
-gh workflow run Release --repo ralph/Pastry --ref master -f version=0.1.0
+gh workflow run Release --repo ralph/Pastry --ref main -f version=0.1.0
 ```
 
 The version is only for the dry run — pass one that exists in the changelog to
