@@ -26,7 +26,11 @@ final class Paster {
     private let requestTrust: () -> Void
     private let delay: Duration
     private var hasAskedForPermission = false
-    private var isPasting = false
+    /// True from the moment focus is yielded until the keystroke has been
+    /// sent. Readable because the keystroke is synthesised into whatever
+    /// window is key, so anything that could take key status in the meantime
+    /// has to hold off until this is false.
+    private(set) var isPasting = false
 
     init(
         write: @escaping (String) -> Void,

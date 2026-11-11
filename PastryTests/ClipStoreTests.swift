@@ -111,6 +111,22 @@ struct ClipStoreTests {
         #expect(store.count == 1)
     }
 
+    /// How the bezel finds the clip it is showing again after the history
+    /// has moved underneath it.
+    @Test("reports where a clip is now, or nothing when it is gone")
+    func firstIndexFollowsTheClip() {
+        let store = ClipStore()
+        store.add(Clip.fixture("old"))
+        store.add(Clip.fixture("shown"))
+        #expect(store.firstIndex(of: Clip.fixture("shown")) == 0)
+
+        store.add(Clip.fixture("copied while the bezel was open"))
+        #expect(store.firstIndex(of: Clip.fixture("shown")) == 1)
+
+        store.remove(Clip.fixture("shown"))
+        #expect(store.firstIndex(of: Clip.fixture("shown")) == nil)
+    }
+
     /// The bezel reads a clip, the user walks and then deletes, and a copy in
     /// another application lands in between — shifting every index down by
     /// one. Removing by position would take the wrong clip, with the right

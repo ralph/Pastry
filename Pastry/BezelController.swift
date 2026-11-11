@@ -71,6 +71,19 @@ final class BezelController: BezelPanelDelegate {
         // Key without activating: the paste must land in the app the user came
         // from, and only a key window sees the modifier release.
         panel.makeKeyAndOrderFront(nil)
+
+        // A release that happened before the panel had key status went to the
+        // application the user came from, and no later flagsChanged will
+        // arrive to replace it — the bezel would sit there holding modifiers
+        // nobody is pressing. Building the hosting view the first time is
+        // slow enough to lose a quick tap this way. Reading the live state
+        // once the panel is key closes that window, and makes tapping the
+        // hotkey and letting straight go paste the newest clip, which is
+        // what the gesture looks like it should do.
+        if !hotKey.modifiers.isEmpty,
+           NSEvent.modifierFlags.intersection(hotKey.modifiers).isEmpty {
+            perform(.paste)
+        }
     }
 
     func hide() {
@@ -135,7 +148,22 @@ final class BezelController: BezelPanelDelegate {
         perform(action)
     }
 
+    /// Puts the cursor back on the clip that is on screen.
+    ///
+    /// Capture keeps running while the bezel is open, and a copy made in
+    /// another application inserts at the top, moving every index down.
+    /// Without this the next "older" would land on the clip already shown —
+    /// and after two captures it would move towards newer instead.
+    private func rebase() {
+        selection.count = store.count
+        if let displayed, let index = store.firstIndex(of: displayed) {
+            selection.jump(to: index)
+        }
+        selection.clamp()
+    }
+
     private func perform(_ action: BezelAction) {
+        rebase()
         switch action {
         case .older: selection.older()
         case .newer: selection.newer()

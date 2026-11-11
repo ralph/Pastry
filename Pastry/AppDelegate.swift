@@ -174,8 +174,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // A nil hotkey means the combination is already taken; HotKey logs
         // the reason. The menu still works, so this is not fatal.
-        hotKey = HotKey(combination: combination) { [weak bezel] in
-            bezel?.hotKeyPressed()
+        hotKey = HotKey(combination: combination) { [weak self] in
+            guard let self else { return }
+            // A paste in flight sends ⌘V to whatever window is key once the
+            // focus handoff has settled. Showing the bezel now would make it
+            // that window, so the keystroke would walk its history instead
+            // of pasting and the clip would go nowhere. The wait is 0.2 s.
+            guard paster?.isPasting != true else { return }
+            bezel.hotKeyPressed()
         }
     }
 

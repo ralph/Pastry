@@ -72,6 +72,14 @@ final class ClipStore {
         onChange?(.routine)
     }
 
+    /// Where a clip is now, by the text identity the rest of the store uses.
+    ///
+    /// For a caller holding a clip it read earlier and needing to know what
+    /// moved underneath it since.
+    func firstIndex(of clip: Clip) -> Int? {
+        clips.firstIndex { $0.text == clip.text }
+    }
+
     /// Removes a clip from the history.
     ///
     /// Identified by text, like `moveToTop(_:)` and for the same reason: the
