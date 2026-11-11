@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenu: StatusMenu?
     private(set) var store = ClipStore()
     private(set) var monitor: ClipboardMonitor?
+    private(set) var paster: Paster?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppEnvironment.isRunningTests else { return }
@@ -45,14 +46,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         monitor.start()
         self.monitor = monitor
+        // Pastes are written through the monitor so the clip Pastry puts on
+        // the pasteboard is not captured straight back as a new one. Captured
+        // strongly: this delegate owns both for the process lifetime, so there
+        // is no cycle, and a nil monitor would mean pasting stale text.
+        paster = Paster(write: { text in monitor.write(text) })
     }
 
-    /// Puts a chosen clip on the pasteboard. Feature 4 adds the keystroke that
-    /// pastes it into the frontmost application.
+    /// Pastes a chosen clip into the application the user came from.
     private func choose(_ clip: Clip) {
-        monitor?.write(clip.text)
         store.moveToTop(clip)
-        Log.clipboard.info("copied a clip of \(clip.text.utf8.count) bytes back to the pasteboard")
+        Task { [weak self] in
+            guard let outcome = await self?.paster?.paste(clip.text) else { return }
+            Log.clipboard.info(
+                "chose a clip of \(clip.text.utf8.count) bytes: \(outcome.rawValue, privacy: .public)"
+            )
+        }
     }
 
     private func record(_ clip: Clip) {

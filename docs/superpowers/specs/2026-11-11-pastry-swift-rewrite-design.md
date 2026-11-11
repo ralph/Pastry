@@ -172,8 +172,20 @@ mechanism available.
    left command key, which some applications require.
 
 Checks `AXIsProcessTrusted()` and, when untrusted, prompts once via
-`AXIsProcessTrustedWithOptions` and surfaces a clear explanation instead of
-silently doing nothing.
+`AXIsProcessTrustedWithOptions`. The clip is still written to the pasteboard in
+that case, so ⌘V by hand works — a clipboard manager that silently does nothing
+is worse than one that copies but cannot paste.
+
+**Known limitation: non-QWERTY key positions.** The keystroke is posted by key
+code, which is a physical key position rather than the letter V. QWERTY, QWERTZ
+and AZERTY all carry V at that position, and Apple's "Dvorak — QWERTY ⌘" layout
+reverts to QWERTY positions while Command is held, so those paste correctly.
+Plain Dvorak and Colemak do not: Pastry posts whatever letter sits at that
+position, so the paste triggers a different shortcut. Flycut used to look up the
+key producing "V" in the current layout and replaced that with the fixed key
+code to fix a layout bug (upstream `f36ca24`), which is why this is where the
+code sits. A proper fix is a `UCKeyTranslate` reverse lookup with the fixed key
+code as the fallback; it is not implemented because no Pastry user is affected.
 
 ### 5.5 `StatusMenu` (AppKit)
 
