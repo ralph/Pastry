@@ -1,24 +1,39 @@
 # Changelog
 
-## 1.9.7 (2026-08-04)
+Pastry's own history. Flycut's, up to 1.9.7, is in
+[that project's repository](https://github.com/TermiT/Flycut).
 
-First release since 1.9.6 (2020). Focused on crash fixes and modern-macOS
-compatibility.
+## Unreleased — 0.1.0
 
-- Fixed a crash on macOS 26 when copying large content from Microsoft Remote
-  Desktop Connection (the menu-bar icon update ran off the main thread). (#262, #279)
-- Fixed an intermittent crash when a copy was quickly followed by a paste — the
-  clipboard store was being modified from a background thread while the UI read
-  it. Clipboard capture is now serialized on the main thread.
-- Fixed pasting on non-QWERTY keyboard layouts (Russian, Dvorak, and others),
-  where the synthesized ⌘V could fail or trigger the wrong action. (#264)
-- Fixed a guaranteed crash when lowering the "Save" preference below "After each
-  clip" while iCloud Clippings Sync was enabled.
-- Fixed the menu search field returning wrong or stale results. (#290)
-- Fixed a crash when enabling iCloud sync in unsigned/local builds that lack
-  iCloud entitlements; sync now degrades gracefully instead. (#321)
-- The project again builds cleanly on current Xcode.
+The first Pastry. A Swift rewrite of Flycut, built from nothing and carrying
+over no Objective-C.
 
-Credits: menu-search fix by @chzhc; several fixes adapted from the
-actively-maintained community fork (haad/Flycut) and from contributor pull
-requests (#314, #322, #323).
+### What it does
+
+- Remembers what you copy, newest first, skipping clippings an application
+  marks as concealed.
+- A menu-bar menu with the recent clippings and a search field to filter them.
+  Choosing one pastes it where you were typing.
+- A bezel on **⇧⌘V**: hold the modifiers and tap the key to walk back through
+  the history, let go to paste. Arrows, `j`/`k`, the number keys, Home, End
+  and the page keys all move; Return pastes, Delete removes, Escape dismisses.
+- The hotkey is yours to change, in Settings › Hotkeys, and takes effect
+  without a relaunch.
+- Clear All and Merge All, the latter joining the whole history into one
+  clipping.
+- The history survives a relaunch, kept in a directory only you can read.
+  Deleting anything reaches the disk at once rather than at the next quiet
+  moment.
+- Settings for how many clippings to remember and how many to show, and for
+  launching at login.
+
+### What it does not do, on purpose
+
+No iCloud or cross-device sync, no favourites, no appearance settings, no iOS
+app. Everything that was a preference in Flycut but had one sensible answer is
+now that answer.
+
+### Needs
+
+macOS 26 or later, and Accessibility permission to paste for you. Without that
+permission a chosen clipping still goes on the clipboard.
