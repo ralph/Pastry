@@ -117,6 +117,19 @@ struct PreferencesTests {
         #expect(preferences.hotKeyIsUnavailable)
     }
 
+    /// A refusal can cure itself: one that failed at launch is retried by
+    /// any later settings change, and when that takes, the warning must not
+    /// go on standing over a hotkey that now works.
+    @Test("clears the warning once the combination registers")
+    func clearsTheWarningOnSuccess() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        preferences.reportHotKeyRefused()
+        #expect(preferences.hotKeyIsUnavailable)
+
+        preferences.reportHotKeyRegistered()
+        #expect(!preferences.hotKeyIsUnavailable)
+    }
+
     /// Recording the same combination again is how a user retries one that
     /// was refused, after quitting whatever had taken it. An early return on
     /// the unchanged value used to swallow the retry and leave the warning

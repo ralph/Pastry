@@ -29,11 +29,12 @@ struct HotKeysSettingsView: View {
     private var footerText: String {
         if let rejection { return rejection }
         if preferences.hotKeyIsUnavailable {
-            // Deliberately says nothing about what is registered instead.
-            // Usually the previous combination still is — but when the very
-            // first one was refused at launch there is no previous one, and
-            // Pastry has no hotkey at all.
-            return "Another app is already using that combination. Try a different one."
+            // Not "another app is using it": macOS does not report hotkey
+            // conflicts at all — verified, both ordinary and exclusive
+            // registration succeed while another application holds the same
+            // combination — so this only ever means the registration itself
+            // failed, and we cannot say why.
+            return "Pastry could not register that combination. Try a different one."
         }
         return "Hold the modifiers and tap the key to walk back through the history. Let go to paste."
     }

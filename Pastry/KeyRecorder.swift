@@ -14,6 +14,8 @@ import SwiftUI
 final class KeyRecorderView: NSButton {
     var onOutcome: ((HotKeyRecordingOutcome) -> Void)?
 
+    private var monitor: Any?
+
     /// What to show when not recording.
     var combinationTitle = "" {
         didSet {
@@ -65,27 +67,41 @@ final class KeyRecorderView: NSButton {
         return super.resignFirstResponder()
     }
 
-    override func keyDown(with event: NSEvent) {
-        guard isRecording else {
-            super.keyDown(with: event)
+    /// Watches keys for as long as the recorder has a window.
+    ///
+    /// A local monitor rather than `keyDown`, because by the time an event
+    /// reaches a view AppKit has already acted on some of them: Tab moves
+    /// focus, Space and Return work the button, and ⌘-anything is a key
+    /// equivalent that the window or NSApp claims first. The monitor sees
+    /// every one before any of that and can swallow it.
+    ///
+    /// Local, not global: this window belongs to the active application.
+    /// Kept for the view's lifetime and gated on `isRecording`, rather than
+    /// torn down from inside its own handler.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil else {
+            stopMonitoring()
             return
         }
-        let outcome = HotKeyRecording.outcome(
-            keyCode: event.keyCode,
-            modifiers: event.modifierFlags
-        )
-        // Every outcome is conclusive: a modifier on its own arrives through
-        // flagsChanged, which this never sees.
-        window?.makeFirstResponder(nil)
-        onOutcome?(outcome)
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, isRecording else { return event }
+            let outcome = HotKeyRecording.outcome(
+                keyCode: event.keyCode,
+                modifiers: event.modifierFlags
+            )
+            // Every outcome is conclusive: a modifier pressed on its own
+            // arrives through flagsChanged, which this never matches.
+            window?.makeFirstResponder(nil)
+            onOutcome?(outcome)
+            return nil
+        }
     }
 
-    /// Keeps ⌘-anything from reaching the window's key equivalents, or
-    /// NSApp's, while recording.
-    override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard isRecording else { return super.performKeyEquivalent(with: event) }
-        keyDown(with: event)
-        return true
+    private func stopMonitoring() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
     }
 
     private func refreshTitle() {

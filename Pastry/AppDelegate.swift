@@ -70,7 +70,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // stepper in the General tab. registerHotKey is idempotent and
         // returns early when the combination is already the registered one,
         // so no Carbon call happens for a change that was not about it.
-        if !registerHotKey(preferences.hotKey) {
+        if registerHotKey(preferences.hotKey) {
+            // Clears a warning from a registration that has since started
+            // working — one refused at launch is retried by any later
+            // settings change, and may well take.
+            preferences.reportHotKeyRegistered()
+        } else {
             preferences.reportHotKeyRefused()
         }
     }
@@ -222,10 +227,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.bezel = bezel
 
-        if !registerHotKey(combination) {
-            // Already owned by another application. The menu still works, so
-            // this is not fatal — but the Hotkeys tab has to say so.
-            Log.clipboard.error("the hotkey is unavailable; another app may already own it")
+        if registerHotKey(combination) {
+            preferences?.reportHotKeyRegistered()
+        } else {
+            // The menu still works, so this is not fatal — but the Hotkeys
+            // tab has to say so.
+            Log.clipboard.error("could not register the hotkey")
             preferences?.reportHotKeyRefused()
         }
     }

@@ -126,6 +126,16 @@ final class Preferences {
     /// Assigned through the backing property rather than `hotKey`, which
     /// would clear the very flag being set and announce a change that is
     /// really the undoing of one.
+    /// Records that the combination is registered.
+    ///
+    /// Needed because a refusal can cure itself: a registration that failed
+    /// at launch is retried on the next settings change of any kind, and
+    /// when that one takes, the warning must not go on standing.
+    func reportHotKeyRegistered() {
+        hotKeyIsUnavailable = false
+        previousHotKey = nil
+    }
+
     func reportHotKeyRefused() {
         hotKeyIsUnavailable = true
         guard let previousHotKey else { return }

@@ -193,6 +193,10 @@ extension HotKeyCombination {
     }
 
     /// As a Mac shortcut is always written: ⌃⌥⇧⌘ and then the key.
+    ///
+    /// Main-actor because naming the key asks the text input services, which
+    /// want the main thread in a UI application.
+    @MainActor
     var displayString: String {
         var text = ""
         if modifiers.contains(.control) { text += "⌃" }
@@ -219,11 +223,13 @@ extension HotKeyCombination {
     /// A key code is a physical position — the limitation the design spec
     /// records for the paste keystroke — so a fixed table would name the key
     /// wrongly for anyone not on ANSI. This asks what that position produces.
+    @MainActor
     private static func keyName(for keyCode: UInt16) -> String {
         if let special = specialKeyNames[Int(keyCode)] { return special }
         return translated(keyCode)?.uppercased() ?? "Key \(keyCode)"
     }
 
+    @MainActor
     private static func translated(_ keyCode: UInt16) -> String? {
         guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
               let data = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
@@ -237,7 +243,7 @@ extension HotKeyCombination {
             var characters = [UniChar](repeating: 0, count: 4)
             let status = UCKeyTranslate(
                 header, keyCode, UInt16(kUCKeyActionDisplay), 0,
-                UInt32(LMGetKbdType()), OptionBits(kUCKeyTranslateNoDeadKeysBit),
+                UInt32(LMGetKbdType()), OptionBits(kUCKeyTranslateNoDeadKeysMask),
                 &deadKeys, characters.count, &length, &characters
             )
             guard status == noErr, length > 0 else { return nil }

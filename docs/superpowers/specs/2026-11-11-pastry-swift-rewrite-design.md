@@ -381,6 +381,15 @@ stored — they ride along on ordinary events and would make a combination
 Carbon could never match again. Escape cancels the recording rather than
 being recorded, since it is also the bezel's dismiss key.
 
+**macOS does not report hotkey conflicts.** Verified while another
+application held ⇧⌘V: `RegisterEventHotKey` succeeds for the same
+combination both with options `0` and with `kEventHotKeyExclusive`, and both
+applications then receive the key — which is exactly what happened when
+Pastry and Flycut ran together during feature 7, two bezels appearing at
+once. So Pastry cannot tell the user that a combination is taken, and does
+not claim to: a failed registration means only that registration failed. The
+refusal path below is for that, not for conflict detection.
+
 The new combination is **registered before the old one is released**. Carbon
 is the only thing that knows whether another application already owns a
 combination, and `RegisterEventHotKey` refusing is how that is discovered;
