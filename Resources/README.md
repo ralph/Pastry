@@ -33,8 +33,9 @@ Full detail — the design, the colour convention, the layer grouping, what has
 been verified mechanically and what still needs a human in Icon Composer — is
 in [`icon/README.md`](icon/README.md).
 
-The icon is not yet referenced by the Xcode project; wiring it into the target
-is feature 10 of the rewrite plan.
+The icon ships: the bundle lives at `Pastry/Pastry.icon`, inside the folder
+the Xcode project synchronises, and `ASSETCATALOG_COMPILER_APPICON_NAME`
+names it as the app icon.
 
 Note that the menu-bar status item glyph is a **separate** asset — a flat
 monochrome SF Symbol template, because macOS requires menu bar items to be
