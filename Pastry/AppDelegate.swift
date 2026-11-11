@@ -17,7 +17,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = MenuBarIcon.image()
+        if let image = MenuBarIcon.image() {
+            item.button?.image = image
+        } else {
+            // A status item with neither image nor title draws zero width. For
+            // an agent app that would look exactly like a failed launch, with
+            // no way left to quit it, so fall back to something visible.
+            item.button?.title = "Pastry"
+        }
         item.menu = StatusMenu.make()
         statusItem = item
     }
