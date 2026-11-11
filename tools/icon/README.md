@@ -44,7 +44,7 @@ still be renamed without touching the artwork.
 ## Rebuilding
 
 ```sh
-cd Resources/icon
+cd tools/icon
 python3 build_icon.py       # regenerates Pastry/Pastry.icon
 python3 preview_icon.py     # re-renders pastry-icon.png from the bundle
 ```
@@ -197,11 +197,12 @@ to build or ship the app; Xcode compiles the bundle as it is.
 
 ## Note on location
 
-The bundle itself is now at `Pastry/Pastry.icon`, out of harm's way: it has to
-live inside the synchronised `Pastry/` folder for actool to compile it, and
-`ASSETCATALOG_COMPILER_APPICON_NAME = Pastry` names it as the app icon.
+This folder lives in `tools/` because it is tooling: it *builds* an input to
+the app rather than documenting one. The bundle it writes, `Pastry/Pastry.icon`,
+has to sit inside the folder the Xcode project synchronises, which is what
+gets actool to compile it into the app.
 
-**This folder — the generator and its sources — is still under `Resources/`,
-which feature 10 deletes wholesale along with the rest of the Objective-C
-tree. It must move, not be deleted**, or the icon becomes a binary blob nobody
-can regenerate.
+It used to live in `Resources/` beside the legacy Flycut artwork. That whole
+folder was deleted in feature 10; this moved out first, because without the
+generator and these vector sources the icon bundle would be a binary nobody
+could regenerate.
