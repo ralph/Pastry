@@ -5,9 +5,26 @@ is pushed. It runs the tests, builds the app, signs it, packages a DMG,
 notarizes and staples **the DMG**, and opens a **draft** GitHub release with it
 attached — draft so you see it before anyone else does.
 
+The release notes come from the matching section of `CHANGELOG.md`, so write
+that before tagging. A version with no section gets a bare title and a warning
+rather than a failure.
+
 The workflow adapts to whichever secrets are present. With none it still
 builds and packages, unsigned, so you can watch it work before setting any of
 this up. With all six it does the whole job.
+
+## Trying it without tagging
+
+The workflow can be run by hand. It builds, signs and notarizes exactly as a
+tag would, but publishes nothing:
+
+```bash
+gh workflow run Release --repo ralph/Pastry --ref master -f version=0.1.0
+```
+
+The version is only for the dry run — pass one that exists in the changelog to
+see the notes it would publish. Leave it out and it builds `0.0.0`. The DMG is
+attached to the run as an artifact either way.
 
 ## The six secrets
 
