@@ -18,8 +18,16 @@ private final class FakeClipboard: ClipboardSource {
     /// How many times the monitor asked for the text.
     private(set) var readCount = 0
 
+    /// Runs while `string()` is "suspended", so a test can land another
+    /// pasteboard operation in the middle of a read.
+    var duringRead: (() -> Void)?
+
     func string() async -> String? {
         readCount += 1
+        if let duringRead {
+            self.duringRead = nil
+            duringRead()
+        }
         if failNextRead {
             failNextRead = false
             return nil
@@ -204,6 +212,22 @@ struct ClipboardMonitorTests {
         // early-out, so an image sitting on the pasteboard is not re-read
         // twice a second for as long as it is there.
         #expect(clipboard.readCount == 2)
+    }
+
+    /// Reading the pasteboard suspends, and choosing a menu row writes during
+    /// that window. Restoring the poll's older change count afterwards would
+    /// un-suppress the write and capture Pastry's own paste on the next cycle.
+    @Test("a write landing during a slow read keeps its suppression")
+    func writeDuringASlowReadKeepsSuppression() async {
+        var captured: [Clip] = []
+        let (clipboard, monitor) = makeMonitor { captured.append($0) }
+        clipboard.copy("something the user copied")
+        clipboard.duringRead = { [monitor] in monitor.write("pasted by Pastry") }
+
+        await monitor.poll()
+        await monitor.poll()
+
+        #expect(captured.isEmpty)
     }
 
     /// The old two-step contract — write, then suppress — could swallow a copy

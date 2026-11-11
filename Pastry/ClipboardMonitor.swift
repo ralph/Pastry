@@ -81,7 +81,8 @@ final class ClipboardMonitor {
 
     func poll() async {
         let changeCount = source.changeCount
-        guard changeCount != lastChangeCount else { return }
+        let seenBeforeReading = lastChangeCount
+        guard changeCount != seenBeforeReading else { return }
 
         if source.hasType(Self.concealedType) {
             lastChangeCount = changeCount
@@ -89,7 +90,15 @@ final class ClipboardMonitor {
             return
         }
 
-        guard let text = await source.string() else {
+        let read = await source.string()
+
+        // Reading suspends, and write(_:) can land while it does — choosing a
+        // menu row does exactly that. Its change count is the current one now,
+        // so writing this poll's older count back would un-suppress the paste
+        // and capture Pastry's own clip on the next cycle.
+        guard lastChangeCount == seenBeforeReading else { return }
+
+        guard let text = read else {
             // A writer bumps the change count with clearContents() before it
             // supplies the data, so a poll landing in that gap sees no text.
             // Give it one more cycle before writing the change off, rather

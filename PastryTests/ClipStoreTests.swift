@@ -111,6 +111,38 @@ struct ClipStoreTests {
         #expect(store.count == 1)
     }
 
+    @Test("moves a clip to the top keeping its app and date")
+    func moveToTopPreservesMetadata() {
+        let store = ClipStore()
+        let older = Clip.fixture("older", app: "Safari", at: 100)
+        store.add(older)
+        store.add(Clip.fixture("newer", app: "Terminal", at: 200))
+        store.moveToTop(older)
+        #expect(store.clips.map(\.text) == ["older", "newer"])
+        #expect(store.clips.first?.appName == "Safari")
+        #expect(store.clips.first?.date == Date(timeIntervalSince1970: 100))
+    }
+
+    /// The caller may be holding a copy read before the list shifted, so the
+    /// stored clip's own metadata wins over the one passed in.
+    @Test("keeps the stored clip's metadata, not the caller's copy")
+    func moveToTopPrefersTheStoredClip() {
+        let store = ClipStore()
+        store.add(Clip.fixture("shared", app: "Safari", at: 100))
+        store.add(Clip.fixture("other"))
+        store.moveToTop(Clip.fixture("shared", app: "Stale", at: 999))
+        #expect(store.clips.first?.appName == "Safari")
+        #expect(store.clips.first?.date == Date(timeIntervalSince1970: 100))
+    }
+
+    @Test("ignores a clip that is not in the history")
+    func moveToTopOfAnAbsentClip() {
+        let store = ClipStore()
+        store.add(Clip.fixture("only"))
+        store.moveToTop(Clip.fixture("never added"))
+        #expect(store.clips.map(\.text) == ["only"])
+    }
+
     @Test("clear empties the history")
     func clearEmpties() {
         let store = ClipStore()
