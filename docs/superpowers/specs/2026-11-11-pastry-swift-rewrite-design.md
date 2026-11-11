@@ -452,18 +452,28 @@ repository and `upstream` removed. Full git history is pushed, so Flycut's
 history — and the commit that finally deletes it — stays meaningful. The
 directory may be renamed to `Pastry` at any later point.
 
-Flycut is MIT licensed. `license.txt` is retained and the README credits Flycut
-and Jumpcut as the lineage.
+Flycut is MIT licensed. The licence is retained — as `LICENSE`, so GitHub
+shows it — carrying General Arcade's notice alongside Pastry's own, and the
+README credits Flycut and Jumpcut as the lineage. Every line of Swift is new,
+but Pastry reimplements their design and lives in a fork of Flycut's
+repository, so removing the notice was not a call the rewrite was entitled to
+make.
 
-Project structure:
+Project structure, as it ended up:
 
 ```
 Pastry.xcodeproj
-Pastry/              synchronized folder group — app sources
+Pastry/              synchronized folder group — app sources, and Pastry.icon
 PastryTests/         synchronized folder group — unit tests
-docs/
-.github/workflows/release.yml
+tools/icon/          generates Pastry/Pastry.icon from parametric geometry
+docs/superpowers/    the spec and one plan per feature
+.github/workflows/   ci.yml and release.yml
+README.md  CHANGELOG.md  RELEASE_SETUP.md  LICENSE
 ```
+
+`tools/icon/` is outside `Pastry/` because it builds an input to the app
+rather than being part of it; `Pastry.icon` itself has to sit inside the
+synchronized folder for actool to compile it (§6.5).
 
 A plain committed `.xcodeproj` using Xcode's **synchronized folder groups**:
 files added to the folder join the target automatically, so adding a Swift file
@@ -472,19 +482,32 @@ to adopt XcodeGen or Tuist while adding no tooling to CI.
 
 ## 10. Build, signing and release
 
-The existing workflow is adapted rather than replaced — it already imports a
-Developer ID certificate, signs inside-out, notarizes with an App Store Connect
-API key, staples, builds a DMG and publishes a GitHub Release on a `v*` tag.
+Written fresh rather than adapted: the repository held a `RELEASE_SETUP.md`
+describing a `release.yml` that did not exist, so there was nothing to adapt.
 
-It gets simpler: no embedded framework to sign, no helper app inside
-`Contents/Library/LoginItems`, and a single entitlements file (hardened runtime,
-no sandbox, no iCloud, no `aps-environment`).
+`.github/workflows/release.yml` runs on a `v*` tag. It takes the version from
+the tag — so the tag and the bundle cannot disagree — builds Release, signs
+with Developer ID, submits the DMG to `notarytool`, staples it, and opens a
+**draft** GitHub release with the DMG attached. Draft so the artifact is
+looked at before anyone else can reach it.
 
-Six repository secrets are required, and must be re-created for the new
-repository with Ralph's own team: `CERTIFICATES_P12`, `CERTIFICATES_PASSWORD`,
-`NOTARY_TEAM_ID` (`89S4HZY343`), `NOTARY_KEY`, `NOTARY_KEY_ID`,
-`NOTARY_ISSUER_ID`. `RELEASE_SETUP.md` is rewritten accordingly, dropping the
-Mac App Store channel entirely.
+It needs no entitlements file: there is no sandbox, no iCloud and no helper
+app, and the hardened runtime is a build setting. Nothing is embedded, so
+there is no inside-out signing to do.
+
+**Missing secrets are not a failure.** Without a certificate it builds
+unsigned, warns, and still produces a DMG, so the workflow can be exercised
+before any of the signing setup exists.
+
+The DMG is built with `diskutil image create`, falling back to `hdiutil
+create`: the latter is deprecated as of macOS 26, but the replacement is new
+enough that a runner image might not carry it. Both were verified to produce
+an image that mounts with the app and an Applications symlink.
+
+Six repository secrets, with Ralph's own team: `CERTIFICATES_P12`,
+`CERTIFICATES_PASSWORD`, `NOTARY_TEAM_ID` (`89S4HZY343`), `NOTARY_KEY`,
+`NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`. `RELEASE_SETUP.md` covers them, and
+drops the Mac App Store channel entirely.
 
 ## 11. Testing
 
@@ -526,6 +549,11 @@ Ten features, each its own pull request, each leaving the app working.
 
 Deletion is last so the reference implementation stays readable while the
 replacement is built.
+
+**All ten are done.** The repository holds nothing but Pastry: 381 files and
+just over 40,000 lines of Objective-C, vendored libraries, nibs and the iOS
+target were removed in one commit, with the 198 tests passing either side of
+it as the check that nothing deleted was still reachable.
 
 ## 13. Risks
 
