@@ -72,8 +72,15 @@ final class ClipStore {
         onChange?(.routine)
     }
 
-    func remove(at index: Int) {
-        guard clip(at: index) != nil else { return }
+    /// Removes a clip from the history.
+    ///
+    /// Identified by text, like `moveToTop(_:)` and for the same reason: the
+    /// caller is acting on a clip it read earlier, and capture continues in
+    /// the meantime, so the position it saw may now hold something else. A
+    /// clip that is no longer there is not an error — it may have been
+    /// trimmed away or already removed.
+    func remove(_ clip: Clip) {
+        guard let index = clips.firstIndex(where: { $0.text == clip.text }) else { return }
         clips.remove(at: index)
         onChange?(.immediate)
     }

@@ -100,15 +100,32 @@ struct ClipStoreTests {
         #expect(store.clip(at: -1) == nil)
     }
 
-    @Test("removes a clip by index and ignores an out-of-range index")
-    func removeAtIndex() {
+    @Test("removes a clip and ignores one that is not there")
+    func removeByIdentity() {
         let store = ClipStore()
         store.add(Clip.fixture("old"))
         store.add(Clip.fixture("new"))
-        store.remove(at: 0)
+        store.remove(Clip.fixture("new"))
         #expect(store.clips.map(\.text) == ["old"])
-        store.remove(at: 9)
+        store.remove(Clip.fixture("never added"))
         #expect(store.count == 1)
+    }
+
+    /// The bezel reads a clip, the user walks and then deletes, and a copy in
+    /// another application lands in between — shifting every index down by
+    /// one. Removing by position would take the wrong clip, with the right
+    /// one still on screen.
+    @Test("removes the clip it was given even after the history shifted")
+    func removeSurvivesAShiftedHistory() {
+        let store = ClipStore()
+        store.add(Clip.fixture("old"))
+        store.add(Clip.fixture("shown"))
+        let shown = Clip.fixture("shown")
+
+        store.add(Clip.fixture("copied while the bezel was open"))
+        store.remove(shown)
+
+        #expect(store.clips.map(\.text) == ["copied while the bezel was open", "old"])
     }
 
     @Test("moves a clip to the top keeping its app and date")
@@ -208,7 +225,7 @@ struct ClipStoreTests {
 
         switch mutation {
         case "add": store.add(Clip.fixture("another"))
-        case "remove": store.remove(at: 0)
+        case "remove": store.remove(Clip.fixture("seed two"))
         case "clear": store.clear()
         case "merge": store.merge()
         case "moveToTop": store.moveToTop(Clip.fixture("seed one"))
@@ -223,7 +240,7 @@ struct ClipStoreTests {
     /// schedule a whole-history write on, for instance, every pasteboard poll
     /// that turned out to hold nothing worth keeping.
     @Test("stays silent when a mutation changes nothing", arguments: [
-        "whitespace", "removeOutOfRange", "moveAbsent", "mergeSingle",
+        "whitespace", "removeAbsent", "moveAbsent", "mergeSingle",
     ])
     func staysSilentWhenNothingChanges(mutation: String) {
         let store = ClipStore()
@@ -234,7 +251,7 @@ struct ClipStoreTests {
 
         switch mutation {
         case "whitespace": store.add(Clip.fixture("   \n  "))
-        case "removeOutOfRange": store.remove(at: 9)
+        case "removeAbsent": store.remove(Clip.fixture("never added"))
         case "moveAbsent": store.moveToTop(Clip.fixture("never added"))
         case "mergeSingle": store.merge()
         default: Issue.record("unknown mutation \(mutation)")

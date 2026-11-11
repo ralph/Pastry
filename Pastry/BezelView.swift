@@ -4,6 +4,9 @@ import SwiftUI
 /// What the bezel shows: where the clip came from, when, its text, and how far
 /// through the history it is.
 struct BezelView: View {
+    /// The panel is sized to this, so the two cannot drift apart.
+    static let size = NSSize(width: 520, height: 280)
+
     let clip: Clip?
     let position: Int
     let count: Int
@@ -15,7 +18,7 @@ struct BezelView: View {
             footer
         }
         .padding(20)
-        .frame(width: 520, height: 280, alignment: .topLeading)
+        .frame(width: Self.size.width, height: Self.size.height, alignment: .topLeading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
     }
 
@@ -40,11 +43,10 @@ struct BezelView: View {
 
     private var text: some View {
         ScrollView {
-            Text(clip?.text ?? "Empty")
+            Text(clip?.previewText ?? "Empty")
                 .font(.system(.body, design: .monospaced))
                 .foregroundStyle(clip == nil ? .secondary : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.disabled)
         }
         .frame(maxHeight: .infinity)
     }

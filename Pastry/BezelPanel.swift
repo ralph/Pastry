@@ -12,6 +12,7 @@ protocol BezelPanelDelegate: AnyObject {
     func bezelPanel(_ panel: BezelPanel, didReceiveKeyDown event: NSEvent)
     func bezelPanel(_ panel: BezelPanel, didChangeFlags event: NSEvent)
     func bezelPanelDidCancel(_ panel: BezelPanel)
+    func bezelPanelDidResignKey(_ panel: BezelPanel)
 }
 
 final class BezelPanel: NSPanel {
@@ -36,6 +37,17 @@ final class BezelPanel: NSPanel {
     // the modifier release that followed pasted instead of dismissing.
     override func cancelOperation(_ sender: Any?) {
         keyDelegate?.bezelPanelDidCancel(self)
+    }
+
+    // Every way out of the bezel — the modifier release, Escape, Return —
+    // arrives as a key event, and only the key window gets those. Clicking
+    // another application, or a Space switch, takes key status away without
+    // closing anything, which would leave the panel floating over everything
+    // with no way left to dismiss it. Losing key status is therefore a
+    // dismissal in itself.
+    override func resignKey() {
+        super.resignKey()
+        keyDelegate?.bezelPanelDidResignKey(self)
     }
 
     init(size: NSSize) {
