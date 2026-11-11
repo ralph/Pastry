@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The App Store requires the sandbox. Deliberately applied to the App
+	     Store build only, never to the Developer ID one: sandboxing moves the
+	     history into a container, and anyone already running the DMG would
+	     appear to lose theirs. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- Nothing else. Pastry has no network access, opens no files the user
+	     chose, and needs no temporary exceptions. Pasting is gated by
+	     Accessibility, which is a permission the user grants, not an
+	     entitlement. -->
+</dict>
+</plist>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pastry — clipboard history for macOS</title>
+<meta name="description" content="Pastry remembers what you copy and gives it back with a keystroke. A menu-bar clipboard manager for macOS. Free, open source, and it sends nothing anywhere.">
+<link rel="icon" href="assets/pastry-256.png" type="image/png">
+<meta property="og:title" content="Pastry — clipboard history for macOS">
+<meta property="og:description" content="Remembers what you copy and gives it back with a keystroke. Free, open source, and it sends nothing anywhere.">
+<meta property="og:image" content="assets/pastry-512.png">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header class="wrap">
+  <img src="assets/pastry-512.png" alt="The Pastry app icon: a pair of scissors cutting a slice of layer cake" width="132" height="132">
+  <h1>Pastry</h1>
+  <p class="tagline">It remembers what you copy, and gives it back with a keystroke.</p>
+  <span class="cta">
+    <a class="button" id="download" href="https://github.com/ralph/Pastry/releases/latest">Download for macOS</a>
+    <span class="fineprint">Free &middot; macOS 26 or later &middot; Apple silicon and Intel</span>
+  </span>
+</header>
+
+<main>
+<section class="wrap">
+  <h2>How it works</h2>
+
+  <div class="card">
+    <h3>Hold <kbd>⇧⌘V</kbd>, tap, let go</h3>
+    <p>Tap <kbd>V</kbd> to walk back through your history in a panel on screen.
+    Let go of the modifiers and the clipping you stopped on is pasted where you
+    were typing. One gesture, and your hands never leave the keyboard.</p>
+  </div>
+
+  <div class="card">
+    <h3>Or just look</h3>
+    <p>Click the scissors in the menu bar for your recent clippings, with a
+    search field to filter them. Choosing one pastes it.</p>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>What else</h2>
+  <ul class="plain">
+    <li><span class="k">Move around</span><span>Arrow keys, <kbd>j</kbd> and <kbd>k</kbd>, or the number keys to jump straight to a position. <kbd>Home</kbd> and <kbd>End</kbd> for the ends.</span></li>
+    <li><span class="k">Prune as you go</span><span><kbd>Delete</kbd> removes the clipping on screen without closing the panel.</span></li>
+    <li><span class="k">Merge</span><span>Join the whole history into one clipping.</span></li>
+    <li><span class="k">Your hotkey</span><span>Change <kbd>⇧⌘V</kbd> to whatever you like. It takes effect immediately, no relaunch.</span></li>
+    <li><span class="k">Your limits</span><span>Decide how many clippings to keep and how many to show.</span></li>
+    <li><span class="k">Starts with you</span><span>Launches at login, if you want it to.</span></li>
+  </ul>
+</section>
+
+<section class="wrap">
+  <h2>Quiet by design</h2>
+  <p class="lead">Pastry has no network access at all.</p>
+  <p>It sends nothing anywhere. There is no account, no sync, no telemetry and
+  no crash reporting. Your clipboard never leaves your Mac, and its contents
+  never reach the system log.</p>
+  <p>Clippings that an application marks as concealed — password fields,
+  mostly — are skipped and never stored. Your history lives in a directory
+  only you can read, and deleting something removes it from disk straight
+  away rather than at some later moment.</p>
+  <p><a href="privacy/">The privacy policy</a> says the same thing at greater
+  length, because the App Store asks for one.</p>
+</section>
+
+<section class="wrap">
+  <h2>Open source</h2>
+  <p>Pastry is MIT licensed. The whole of it is readable, including the
+  <a href="https://github.com/ralph/Pastry/tree/main/docs">design record</a> —
+  what was decided, and more usefully what turned out to be wrong.</p>
+  <p>It is a Swift rewrite of <a href="https://github.com/TermiT/Flycut">Flycut</a>,
+  which was based on Jumpcut. No Objective-C from either remains, but the idea
+  and the shape of it are theirs.</p>
+</section>
+</main>
+
+<footer class="wrap">
+  <a href="https://github.com/ralph/Pastry">Source</a>
+  <a href="support/">Support</a>
+  <a href="privacy/">Privacy</a>
+  <a href="https://github.com/ralph/Pastry/releases">Releases</a>
+  <p>© 2026 Ralph von der Heyden. MIT licensed.</p>
+</footer>
+
+</body>
+</html>

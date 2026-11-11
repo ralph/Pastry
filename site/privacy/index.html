@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Pastry</title>
+<meta name="description" content="Pastry collects nothing, sends nothing, and has no servers.">
+<link rel="icon" href="../assets/pastry-256.png" type="image/png">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<header class="wrap" style="padding-bottom:24px">
+  <a href="../"><img src="../assets/pastry-256.png" alt="Pastry" width="72" height="72"></a>
+  <h1 style="font-size:32px">Privacy</h1>
+</header>
+<main>
+<section class="wrap">
+  <p class="lead">Pastry collects nothing, sends nothing, and has no servers.</p>
+  <p>That is the whole policy. The rest of this page only explains what that
+  means in practice, because "we collect nothing" is a claim worth being
+  specific about.</p>
+</section>
+
+<section class="wrap">
+  <h2>What stays on your Mac</h2>
+  <p>Pastry stores the text you copy so it can give it back to you. That
+  history lives in a file on your Mac, in a directory only your user account
+  can read. It is never transmitted anywhere, because Pastry has no network
+  code of any kind — no analytics, no crash reporting, no update check, no
+  account, no sync.</p>
+  <p>Clippings that an application marks as concealed — password fields,
+  mostly — are skipped and never written down.</p>
+  <p>The contents of your clipboard never reach the system log. Pastry logs
+  only sizes, source application names, and outcomes.</p>
+</section>
+
+<section class="wrap">
+  <h2>What Pastry asks macOS for</h2>
+  <ul class="plain">
+    <li><span class="k">Accessibility</span><span>To paste into the application you were typing in, Pastry synthesises a ⌘V keystroke, which macOS gates behind Accessibility permission. You grant it once, and you can revoke it in System Settings at any time. Without it Pastry still works: the clipping goes onto your clipboard and you paste it yourself.</span></li>
+    <li><span class="k">Launch at login</span><span>Registered through macOS's own login-item service, which you can turn off in System Settings or in Pastry's settings.</span></li>
+  </ul>
+</section>
+
+<section class="wrap">
+  <h2>Deleting your data</h2>
+  <p>Clear All in the menu empties the history and removes it from disk
+  immediately. Deleting the app removes everything it kept. There is nothing
+  held anywhere else, because there is nowhere else.</p>
+</section>
+
+<section class="wrap">
+  <h2>Changes and contact</h2>
+  <p>If this ever changes, it changes in public: the policy lives in the
+  <a href="https://github.com/ralph/Pastry">repository</a> with the rest of
+  the source, and its history is the commit log. Questions go to
+  <a href="https://github.com/ralph/Pastry/issues">GitHub issues</a>.</p>
+  <p class="fineprint">Last updated 11 November 2026.</p>
+</section>
+
+</main>
+<footer class="wrap">
+  <a href="../">Pastry</a>
+  <a href="https://github.com/ralph/Pastry">Source</a>
+  <a href="../support/">Support</a>
+  <a href="../privacy/">Privacy</a>
+  <p>© 2026 Ralph von der Heyden. MIT licensed.</p>
+</footer>
+</body>
+</html>
