@@ -190,7 +190,6 @@ struct ClipStoreTests {
         #expect(store.search("second", limit: 10).count == 1)
     }
 
-||||||| parent of d472a88 (Persist the clipboard history)
     @Test("announces every change to the list", arguments: [
         ("add", ClipStore.Urgency.routine),
         ("remove", .immediate),
