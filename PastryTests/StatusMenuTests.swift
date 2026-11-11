@@ -74,13 +74,39 @@ struct StatusMenuTests {
         #expect(first?.action == nil)
     }
 
-    @Test("offers Clear All, Merge All, About and Quit")
+    @Test("offers Clear All, Merge All, Settings, About and Quit")
     func fixedItemsPresent() {
         let (_, menu) = makeMenu(clips: ["a"])
         #expect(menu.menu.item(withTitle: "Clear All") != nil)
         #expect(menu.menu.item(withTitle: "Merge All") != nil)
+        #expect(menu.menu.item(withTitle: "Settings…") != nil)
         #expect(menu.menu.item(withTitle: "About Pastry") != nil)
         #expect(menu.menu.item(withTitle: "Quit Pastry") != nil)
+    }
+
+    @Test("Settings uses the standard shortcut and calls back")
+    func settingsWiring() {
+        let (_, menu) = makeMenu()
+        let item = menu.menu.item(withTitle: "Settings…")
+        #expect(item?.keyEquivalent == ",")
+        #expect(item?.keyEquivalentModifierMask == .command)
+
+        var opened = 0
+        menu.onOpenPreferences = { opened += 1 }
+        choose(item!)
+        #expect(opened == 1)
+    }
+
+    /// Lowering it in Preferences has to shorten the menu now, not at the
+    /// next launch.
+    @Test("shows fewer rows when the display count is lowered")
+    func honoursALoweredDisplayCount() {
+        let (_, menu) = makeMenu(clips: (0..<10).map { "clip \($0)" }, displayCount: 10)
+        #expect(clipRows(menu).count == 10)
+
+        menu.displayCount = 3
+        refresh(menu)
+        #expect(clipRows(menu).count == 3)
     }
 
     @Test("Quit terminates through the responder chain on Command-Q")

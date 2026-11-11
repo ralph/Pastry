@@ -31,9 +31,18 @@ final class ClipStore {
     /// control, so the value stops being under this file's control.
     var rememberCount: Int {
         didSet {
+            // Assigning inside didSet does not re-run it — this is a plain
+            // class, not an @Observable one — so everything below has to be
+            // reachable in this one pass.
             rememberCount = max(0, rememberCount)
+            guard rememberCount != oldValue else { return }
+
+            let before = clips.count
             trim()
-            onChange?(.routine)
+            // Lowering this deletes the oldest clips, and a deletion is
+            // immediate like every other: a force quit before the next quiet
+            // moment would bring them back. Raising it deletes nothing.
+            onChange?(clips.count < before ? .immediate : .routine)
         }
     }
 

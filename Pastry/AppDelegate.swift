@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var paster: Paster?
     private var bezel: BezelController?
     private var hotKey: HotKey?
+    private(set) var preferences: Preferences?
+    private var preferencesWindow: PreferencesWindowController?
     /// Whatever was active when the menu opened, so focus can go back to it.
     private var previousApp: NSRunningApplication?
     /// True between cancelling the menu and the reopen we asked for.
@@ -26,13 +28,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppEnvironment.isRunningTests else { return }
+        let preferences = installPreferences()
         restoreHistory()
         startMonitoring()
-        installStatusItem()
+        installStatusItem(displayCount: preferences.displayCount)
         installBezel()
     }
 
-    private func installStatusItem() {
+    /// Reads the settings and keeps the rest of the app in step with them.
+    ///
+    /// First, because the history is trimmed to the remember count as it is
+    /// restored and the menu is built with the display count.
+    private func installPreferences() -> Preferences {
+        let preferences = Preferences(loginItem: SystemLoginItem())
+        preferences.applyDefaultLoginItemOnce()
+        store.rememberCount = preferences.rememberCount
+
+        // Reads self.preferences back rather than capturing the local: the
+        // closure is owned by the object it would capture, so holding it
+        // strongly here would be a cycle.
+        preferences.onChange = { [weak self] in self?.applyPreferences() }
+
+        self.preferences = preferences
+        preferencesWindow = PreferencesWindowController(preferences: preferences)
+        return preferences
+    }
+
+    /// Pushes the settings into the parts of the app that hold copies.
+    ///
+    /// Pushed rather than pulled so neither the store nor the menu has to
+    /// know that Preferences exists. Lowering Remember discards the oldest
+    /// clippings, which ClipStore announces as a deletion, so the saver
+    /// writes it out at once instead of leaving clips on disk that the app
+    /// no longer has.
+    private func applyPreferences() {
+        guard let preferences else { return }
+        store.rememberCount = preferences.rememberCount
+        statusMenu?.displayCount = preferences.displayCount
+    }
+
+    private func showPreferences() {
+        preferencesWindow?.show()
+    }
+
+    private func installStatusItem(displayCount: Int) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let image = MenuBarIcon.image() {
             item.button?.image = image
@@ -42,11 +81,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // no way left to quit it, so fall back to something visible.
             item.button?.title = "Pastry"
         }
-        let statusMenu = StatusMenu(store: store) { [weak self] clip in
+        let statusMenu = StatusMenu(store: store, displayCount: displayCount) { [weak self] clip in
             self?.choose(clip)
         }
         statusMenu.onWillOpen = { [weak self] in self?.menuWillOpen() }
         statusMenu.onDidClose = { [weak self] in self?.menuDidClose() }
+        statusMenu.onOpenPreferences = { [weak self] in self?.showPreferences() }
         item.menu = statusMenu.menu
         self.statusMenu = statusMenu
         statusItem = item
@@ -167,9 +207,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // configurable, and this is the single place it will come from.
         let combination = HotKeyCombination.commandShiftV
 
-        let bezel = BezelController(store: store, hotKey: combination) { [weak self] clip in
-            self?.choose(clip)
-        }
+        let bezel = BezelController(
+            store: store,
+            hotKey: combination,
+            paste: { [weak self] clip in self?.choose(clip) },
+            openPreferences: { [weak self] in self?.showPreferences() }
+        )
         self.bezel = bezel
 
         // A nil hotkey means the combination is already taken; HotKey logs

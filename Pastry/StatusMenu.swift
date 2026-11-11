@@ -13,9 +13,13 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSSearchFieldDelegate {
 
     var onWillOpen: (() -> Void)?
     var onDidClose: (() -> Void)?
+    var onOpenPreferences: (() -> Void)?
 
     private let store: ClipStore
-    private let displayCount: Int
+    /// Settable: lowering it in Preferences has to shorten the menu now,
+    /// not at the next launch. The rows are rebuilt before every opening, so
+    /// nothing else has to happen when it changes.
+    var displayCount: Int
     private let onSelect: (Clip) -> Void
 
     /// Internal so tests can drive the real text-change path.
@@ -128,6 +132,7 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSSearchFieldDelegate {
         addItem("Clear All", action: #selector(clearAll), target: self)
         addItem("Merge All", action: #selector(mergeAll), target: self)
         menu.addItem(.separator())
+        addItem("Settings…", action: #selector(preferences), keyEquivalent: ",", target: self)
         addItem("About Pastry", action: #selector(about), target: self)
         addItem("Quit Pastry", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     }
@@ -176,18 +181,22 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSSearchFieldDelegate {
         }
     }
 
-    @discardableResult
+    @objc private func preferences() {
+        onOpenPreferences?()
+    }
+
+    // Returns nothing: no caller has ever used the item it makes, and the
+    // @discardableResult that used to say so was one more thing to get wrong.
     private func addItem(
         _ title: String,
         action: Selector?,
         keyEquivalent: String = "",
         target: AnyObject? = nil
-    ) -> NSMenuItem {
+    ) {
         let item = menu.addItem(withTitle: title, action: action, keyEquivalent: keyEquivalent)
         // A nil target sends the action up the responder chain, which is how
         // Quit reaches NSApplication.
         item.target = target
-        return item
     }
 
     private func setQuery(_ text: String) {

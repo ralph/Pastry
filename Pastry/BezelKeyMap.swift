@@ -14,6 +14,7 @@ enum BezelAction: Equatable {
     case paste
     case delete
     case cancel
+    case preferences
     case ignored
 }
 
@@ -50,6 +51,7 @@ enum BezelKeyMap {
         case kVK_Return, kVK_ANSI_KeypadEnter: return .paste
         case kVK_Delete, kVK_ForwardDelete: return .delete
         case kVK_Escape: return .cancel
+        case kVK_ANSI_Comma where modifiers.contains(.command): return .preferences
         default: break
         }
 

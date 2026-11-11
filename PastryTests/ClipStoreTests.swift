@@ -229,7 +229,8 @@ struct ClipStoreTests {
         ("clear", .immediate),
         ("merge", .routine),
         ("moveToTop", .routine),
-        ("rememberCount", .routine),
+        ("rememberCountLowered", .immediate),
+        ("rememberCountRaised", .routine),
     ])
     func announcesChanges(mutation: String, expected: ClipStore.Urgency) {
         let store = ClipStore()
@@ -245,7 +246,10 @@ struct ClipStoreTests {
         case "clear": store.clear()
         case "merge": store.merge()
         case "moveToTop": store.moveToTop(Clip.fixture("seed one"))
-        case "rememberCount": store.rememberCount = 1
+        // Lowering it throws clips away, which is a deletion and has to
+        // reach the disk now. Raising it throws nothing away.
+        case "rememberCountLowered": store.rememberCount = 1
+        case "rememberCountRaised": store.rememberCount = 80
         default: Issue.record("unknown mutation \(mutation)")
         }
 
@@ -257,6 +261,7 @@ struct ClipStoreTests {
     /// that turned out to hold nothing worth keeping.
     @Test("stays silent when a mutation changes nothing", arguments: [
         "whitespace", "removeAbsent", "moveAbsent", "mergeSingle",
+        "sameRememberCount",
     ])
     func staysSilentWhenNothingChanges(mutation: String) {
         let store = ClipStore()
@@ -267,6 +272,9 @@ struct ClipStoreTests {
 
         switch mutation {
         case "whitespace": store.add(Clip.fixture("   \n  "))
+        case "sameRememberCount":
+            let unchanged = store.rememberCount
+            store.rememberCount = unchanged
         case "removeAbsent": store.remove(Clip.fixture("never added"))
         case "moveAbsent": store.moveToTop(Clip.fixture("never added"))
         case "mergeSingle": store.merge()
