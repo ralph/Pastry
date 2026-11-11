@@ -194,9 +194,10 @@ code as the fallback; it is not implemented because no Pastry user is affected.
 `NSMenuItem`, which `MenuBarExtra(.menu)` cannot express; AppKit also provides
 menu keyboard navigation, type-select and dismissal for free.
 
-Contents, top to bottom: up to `displayNum` clipping rows (newest first), the
-search field, a separator, Clear All, Merge All, Preferences… (⌘,), About
-Pastry, a separator, Quit. Typing in the search field re-filters the rows live;
+Contents, top to bottom: up to the display count in clipping rows (newest
+first), the search field, a separator, Clear All, Merge All, a separator,
+Settings… (⌘,), About Pastry, Quit. Named **Settings…**, not Preferences…,
+which is what macOS has called it since Ventura. Typing in the search field re-filters the rows live;
 ↑/↓ from the field move into the rows.
 
 Rebuilds its rows from scratch in `menuNeedsUpdate(_:)`, which AppKit calls
@@ -298,13 +299,14 @@ is open advances to the next older clipping, which is what makes
 | Return | paste the shown clipping |
 | Delete / Backspace | remove the shown clipping, stay open |
 | Escape | dismiss without pasting |
+| ⌘, | open Settings |
 | clicking away | dismiss without pasting |
 | **release the hotkey's modifiers** | paste the shown clipping |
 
 Modifier release pasting is the primary interaction, and follows from sticky
 bezel being off.
 
-Three rows of Flycut's table are deliberately absent, found while building
+Two rows of Flycut's table are deliberately absent, found while building
 feature 7:
 
 - **⇧ + hotkey key for a newer clipping.** Unreachable for any combination
@@ -313,9 +315,6 @@ feature 7:
   the bezel, so a tap with ⇧⌘ held can only ever mean "older"; the tap that
   does reach the bezel is the one made after letting go of part of the
   combination. ↑, ← and `k` are how the user walks the other way.
-- **⌘, for Preferences.** There is no Preferences window until feature 8, and
-  a key that silently dismissed the bezel would be worse than one that does
-  nothing. It arrives with the window.
 - **Scroll wheel and double-click.** Not implemented; the bezel is a keyboard
   interaction held open by the modifiers, and reaching for the mouse means
   letting go of them, which pastes. Dropped rather than deferred.
@@ -329,16 +328,49 @@ unavoidable reason.
 
 When the list is empty the bezel shows an "Empty" state and pastes nothing.
 
-### 6.4 Preferences
+### 6.4 Settings
 
-A SwiftUI `Settings` scene with two tabs.
+Pastry's own `NSWindow`, hosting a SwiftUI `TabView`. Reached from **Settings…**
+in the status menu and from ⌘, in the bezel, both with the standard shortcut.
+
+Not SwiftUI's `Settings` scene, decided in feature 8. The only way to summon
+that scene from AppKit is
+`NSApp.sendAction(Selector(("showSettingsWindow:")), …)` — a selector that is
+not API and has already been renamed once, so it would break for a user rather
+than for a test. Feature 9's key recorder also needs the window's responder
+chain, which the scene does not hand out. The app keeps an empty `Settings`
+scene only because `App` requires one.
+
+Showing the window needs `NSApp.activate(ignoringOtherApps: true)`: the
+cooperative `NSApp.activate()` does not activate an agent app at all, and with
+no Dock icon a window that came up behind would be unreachable. The same
+lesson as features 3, 5 and 7, and for the same reason nothing here may
+consult `NSApp.isActive`.
 
 **General** — Remember (default 40), Display in menu (default 30), Launch at
-login (default **on**, implemented with `SMAppService.mainApp`). Lowering
-Remember below the current count discards the oldest clippings immediately.
+login (default **on**). Lowering Remember below the current count discards the
+oldest clippings immediately, and because that is a deletion the history file
+is rewritten at once rather than at the next quiet moment.
+
+Both counts are bounded to **1…99**, decided in feature 8: the spec gave
+defaults but no limits, zero for Remember is a way to lose work rather than a
+setting, and 99 is Flycut's own ceiling. They are clamped when read as well as
+when written, since they are ordinary `UserDefaults` keys that anything can
+have written. The two stay independent of each other — a Display count above
+the Remember count simply shows what exists.
+
+Launch at login is `SMAppService.mainApp`, and its state is **read from the
+system every time rather than stored**: the user can turn Pastry off in System
+Settings, and a cached boolean would show a toggle that disagrees with what
+happens at login. `UserDefaults` holds only a marker saying the default has
+been applied once, so a user who turns it off does not find it back on at the
+next launch. A registration still awaiting approval is reported in the window,
+with a button to System Settings, because macOS answers `register()` that way
+rather than with an error.
 
 **Hotkeys** — one `KeyRecorderView` for the bezel hotkey, default ⇧⌘V
-(key code 9 with command+shift).
+(key code 9 with command+shift). Arrives with feature 9, as the window's
+second tab.
 
 ## 7. Persistence
 
