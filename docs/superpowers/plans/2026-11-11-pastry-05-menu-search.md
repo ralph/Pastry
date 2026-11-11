@@ -92,7 +92,6 @@ would silently hide clips the next time the menu opened.
 - [ ] **Step 1: Branch and push the plan**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git checkout master && git pull --ff-only
 git checkout -b feature/05-menu-search
 git add docs/superpowers/plans/2026-11-11-pastry-05-menu-search.md
@@ -105,7 +104,6 @@ git push -u origin feature/05-menu-search
 - [ ] **Step 2: Open the draft pull request**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 gh pr create --repo ralph/Pastry --base master --head feature/05-menu-search \
   --draft --title "Feature 5: search field in the menu" --body "$(cat <<'BODY'
 Type in the status menu to narrow the clip rows.
@@ -190,7 +188,6 @@ Add to `PastryTests/ClipStoreTests.swift`:
 - [ ] **Step 2: Run them and watch them fail**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|TEST (SUCCEEDED|FAILED)" | head -4
 ```
 
@@ -217,7 +214,6 @@ Add to `Pastry/ClipStore.swift`, after `clip(at:)`:
 - [ ] **Step 4: Run the tests and watch them pass**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | grep -E "error:|✘ Test|Test run with|TEST" | head -6
 ```
 
@@ -226,7 +222,6 @@ Expected: `** TEST SUCCEEDED **`, 78 tests.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/ClipStore.swift PastryTests/ClipStoreTests.swift
 git commit -m "Add ClipStore.search
 
@@ -383,7 +378,6 @@ Expected: `** TEST SUCCEEDED **`, 82 tests.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/StatusMenu.swift PastryTests/StatusMenuTests.swift
 git commit -m "Filter the menu rows with a search field
 
@@ -467,7 +461,6 @@ Expected: `** TEST SUCCEEDED **`, 82 tests. The dance itself is not unit tested 
 - [ ] **Step 4: Verify by hand — this is the step that matters**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 rm -rf build/dd
 xcodebuild -project Pastry.xcodeproj -scheme Pastry -configuration Debug -derivedDataPath build/dd build 2>&1 | tail -2
 open build/dd/Build/Products/Debug/Pastry.app
@@ -487,7 +480,6 @@ first time.
 - [ ] **Step 5: Commit and push**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry/AppDelegate.swift Pastry/StatusMenu.swift
 git commit -m "Activate so the menu's search field can take focus
 

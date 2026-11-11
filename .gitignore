@@ -1,13 +1,16 @@
 .DS_Store
 *.swp
-*~.nib
+
+# Xcode
 build/
 DerivedData/
-*.pbxuser
-*.perspective
-*.perspectivev3
-*.mode1v3
-*.mode2v3
 xcuserdata/
 *.xcuserdatad
 .swiftpm/
+Pastry.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+
+# Claude Code's working directories, including its git worktrees
+.claude/
+
+# Release artifacts, which the release workflow writes to the repository root
+*.dmg

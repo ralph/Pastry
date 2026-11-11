@@ -71,7 +71,6 @@ Preferences exists.
 - [ ] **Step 1: Branch and push the plan**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git checkout master && git pull --ff-only
 git checkout -b feature/07-hotkey-bezel
 git add docs/superpowers/plans/2026-11-11-pastry-07-hotkey-bezel.md
@@ -84,7 +83,6 @@ git push -u origin feature/07-hotkey-bezel
 - [ ] **Step 2: Open the draft pull request**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 gh pr create --repo ralph/Pastry --base master --head feature/07-hotkey-bezel \
   --draft --title "Feature 7: hotkey and bezel" --body "$(cat <<'BODY'
 Hold ⌘⇧ and tap V to walk back through the history in a bezel; release

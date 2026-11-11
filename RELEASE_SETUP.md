@@ -1,92 +1,125 @@
-# Cutting a Flycut release
+# Cutting a Pastry release
 
-Releases are produced by `.github/workflows/release.yml`, which runs when a
-`v*` tag is pushed. It builds the macOS app, packages it in a DMG, optionally
-signs + notarizes it, and publishes a GitHub Release with the DMG attached.
+Releases come from `.github/workflows/release.yml`, which runs when a `v*` tag
+is pushed. It runs the tests, builds the app, signs it, packages a DMG,
+notarizes and staples **the DMG**, and opens a **draft** GitHub release with it
+attached — draft so you see it before anyone else does.
 
-## One-time setup: GitHub secrets
+The workflow adapts to whichever secrets are present. With none it still
+builds and packages, unsigned, so you can watch it work before setting any of
+this up. With all six it does the whole job.
 
-Add these under **Settings → Secrets and variables → Actions**. The workflow
-adapts to whichever are present, so you can start with none (test build) and
-add them as you go.
+## The six secrets
 
-| Secret | Purpose |
+Add these under **Settings → Secrets and variables → Actions** in the
+`ralph/Pastry` repository.
+
+| Secret | What it is |
 | --- | --- |
-| `CERTIFICATES_P12` | base64 of your **Developer ID Application** certificate exported as `.p12` |
-| `CERTIFICATES_PASSWORD` | the password you set when exporting the `.p12` |
-| `NOTARY_TEAM_ID` | your Apple Developer Team ID (`S8JLSG5ES7`); used as the signing `DEVELOPMENT_TEAM` |
+| `CERTIFICATES_P12` | base64 of your **Developer ID Application** certificate, exported as `.p12` |
+| `CERTIFICATES_PASSWORD` | the password you set when exporting that `.p12` |
+| `NOTARY_TEAM_ID` | your Apple Developer Team ID — `89S4HZY343` |
 | `NOTARY_KEY` | base64 of your App Store Connect API key (`.p8`) |
-| `NOTARY_KEY_ID` | the API key's **Key ID** |
-| `NOTARY_ISSUER_ID` | the API key's **Issuer ID** |
+| `NOTARY_KEY_ID` | that key's **Key ID** |
+| `NOTARY_ISSUER_ID` | that key's **Issuer ID** |
 
-Notarization uses an **App Store Connect API key** (not an Apple-ID app-specific
-password): it's a team credential, independent of any personal account, and cleanly
-revocable. Create it at **App Store Connect → Users and Access → Integrations → App
-Store Connect API**, generate a **Team Key** (role: Developer), and **download the
-`.p8` once** (it can't be re-downloaded). Note the Key ID and Issuer ID shown there.
+### Exporting the certificate
 
-Export the signing `.p12` and base64-encode the credentials:
+You need a **Developer ID Application** certificate — not Apple Development,
+not Mac App Store. If you have not got one, make it at
+[developer.apple.com/account/resources/certificates](https://developer.apple.com/account/resources/certificates),
+then download and double-click it so it lands in your login keychain.
 
+In **Keychain Access**, find it under **My Certificates**, right-click →
+**Export…**, choose **Personal Information Exchange (.p12)**, and set a
+password. That password is `CERTIFICATES_PASSWORD`.
+
+Then:
+
+```bash
+base64 -i Certificates.p12 | pbcopy
 ```
-# In Keychain Access: export your "Developer ID Application" identity as Certificates.p12
-base64 -i Certificates.p12 | gh secret set CERTIFICATES_P12 -R TermiT/Flycut
-base64 -i AuthKey_XXXXXXXXXX.p8 | gh secret set NOTARY_KEY -R TermiT/Flycut
-gh secret set CERTIFICATES_PASSWORD -R TermiT/Flycut   # prompts for the .p12 passphrase
-gh secret set NOTARY_KEY_ID -R TermiT/Flycut --body "XXXXXXXXXX"
-gh secret set NOTARY_ISSUER_ID -R TermiT/Flycut --body "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-gh secret set NOTARY_TEAM_ID -R TermiT/Flycut --body "S8JLSG5ES7"
+
+and paste that as `CERTIFICATES_P12`.
+
+### Making the notarization key
+
+Notarization uses an App Store Connect API key rather than your Apple ID, so
+no password or app-specific password is involved.
+
+At [appstoreconnect.apple.com/access/integrations/api](https://appstoreconnect.apple.com/access/integrations/api),
+create a key with the **Developer** role. Apple lets you download the `.p8`
+**once**. On that page you also see the **Key ID** and, at the top, the
+**Issuer ID**.
+
+```bash
+base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy
 ```
 
-Behaviour by secrets configured:
-
-- **none** → ad-hoc signed app in the DMG. Gatekeeper will warn; use only for testing.
-- **signing only** → Developer ID signed with hardened runtime (still warned until notarized).
-- **signing + notary** → signed, notarized, and stapled — installs cleanly with no warning.
+`NOTARY_KEY` is that, `NOTARY_KEY_ID` is the Key ID, `NOTARY_ISSUER_ID` is the
+Issuer ID.
 
 ## Cutting a release
 
+The version comes from the tag, so the tag and the bundle cannot disagree:
+`v1.2.3` builds `1.2.3`.
+
+```bash
+git tag v0.1.0
 ```
-# 1. Make sure master is green and the version is bumped (MARKETING_VERSION).
-# 2. Tag and push:
-git tag v1.9.7
-git push origin v1.9.7
+
+```bash
+git push origin v0.1.0
 ```
 
-The workflow stamps `MARKETING_VERSION` from the tag, builds, packages, (signs +
-notarizes if secrets are set), and creates the GitHub Release. Release notes are
-taken from the matching `## 1.9.7` section of `CHANGELOG.md`, falling back to the
-commit log if that section is absent.
+**Push the one tag, never `--tags`.** This repository began as a fork of
+Flycut and still carries its release tags locally (`1.8`, `1.8.1`, `1.8.2`,
+`1.9.3`, `1.9.4`, `1.9.6`). They are not on `origin`, and a `git push --tags`
+would publish six Objective-C Flycut releases onto Pastry. To be rid of the
+risk entirely:
 
-## Two channels: entitlements
+```bash
+git tag -d 1.8 1.8.1 1.8.2 1.9.3 1.9.4 1.9.6
+```
 
-1.9.7 ships on **both** channels, which need different entitlements:
+Then watch **Actions**. When it finishes, the draft release is under
+**Releases** with `Pastry-0.1.0.dmg` attached. Check it, then publish.
 
-- **`Flycut.entitlements`** — Mac App Store build. App Sandbox on, iCloud
-  (CloudKit) container, `aps-environment`. Unchanged; used by the normal Release
-  config and the MAS submission.
-- **`FlycutDeveloperID.entitlements`** — Developer ID direct-download build. Not
-  sandboxed, no MAS-only iCloud/`aps` keys (invalid without a provisioning profile
-  under Developer ID). The workflow passes this via `CODE_SIGN_ENTITLEMENTS` in the
-  archive step. The CloudKit guard added in 1.9.7 means the app runs safely without
-  the iCloud entitlement (sync just no-ops); iCloud sync is unavailable in the
-  direct-download build unless you register a Developer-ID iCloud container.
+## Checking the DMG yourself
 
-### Channel A — Developer ID DMG (this workflow)
+Worth doing once, on the first signed release:
 
-Configure the secrets above, then push a `v*` tag (see below). The workflow builds
-with `FlycutDeveloperID.entitlements`, notarizes, staples, and publishes the DMG.
+```bash
+xcrun stapler validate Pastry-0.1.0.dmg
+```
 
-> First-run caveat: this app bundles a login-item helper and an embedded
-> framework. Notarization requires every nested binary to be Developer ID-signed
-> with the hardened runtime. That can only be fully validated once
-> `CERTIFICATES_P12` is set and the first tagged build runs — expect to iterate
-> once on nested-code signing if notarization reports an unsigned/instrumented
-> nested binary. (The command-line `CODE_SIGN_ENTITLEMENTS` override also applies
-> to the helper, which is harmless — it only launches the main app.)
+```bash
+spctl --assess --type open --context context:primary-signature -vv Pastry-0.1.0.dmg
+```
 
-### Channel B — Mac App Store update
+The second should say `accepted` and `source=Notarized Developer ID`. The real
+test is a machine that has never seen the app: mount the DMG, drag Pastry to
+Applications, and open it. No Gatekeeper warning means it is properly
+notarized.
 
-Don't use this workflow. In Xcode: select the **Flycut** scheme, Product → Archive,
-then Organizer → **Distribute App → App Store Connect**. This uses
-`Flycut.entitlements` (sandbox + iCloud) unchanged and goes through App Review.
-Bump `MARKETING_VERSION` (already 1.9.7) and submit the same source as the DMG.
+## When it goes wrong
+
+**`notarytool` says `Invalid`.** It prints a submission id; ask Apple what it
+objected to:
+
+```bash
+xcrun notarytool log <submission-id> --key AuthKey.p8 --key-id <id> --issuer <id>
+```
+
+Usually a missing hardened runtime or a missing secure timestamp. The
+timestamp comes from the workflow (`OTHER_CODE_SIGN_FLAGS=--timestamp`); the
+hardened runtime is a project setting (`ENABLE_HARDENED_RUNTIME`), so that one
+means the build settings changed. The workflow checks both before submitting,
+so in practice it fails in seconds rather than after Apple's round trip.
+
+**The release is built unsigned.** `CERTIFICATES_P12` is missing or empty. The
+workflow says so in its summary rather than failing, by design.
+
+**Signing fails with `no identity found`.** The `.p12` does not contain a
+Developer ID Application certificate, or it was exported without its private
+key — export from **My Certificates**, not **Certificates**.

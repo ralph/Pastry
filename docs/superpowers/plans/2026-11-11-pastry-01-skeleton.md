@@ -58,7 +58,6 @@ Move the working copy onto a new private standalone repository, keeping full git
 - [ ] **Step 1: Confirm the working tree is clean and on master**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git status --short && git branch --show-current
 ```
 
@@ -75,7 +74,6 @@ Expected: prints the URL of the new repository. If it reports the name is taken,
 - [ ] **Step 3: Repoint the remotes**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git remote remove upstream
 git remote rename origin flycut
 git remote add origin https://github.com/ralph/Pastry.git
@@ -87,7 +85,6 @@ Expected: `origin` → `ralph/Pastry`, `flycut` → `ralph/Flycut`. The old fork
 - [ ] **Step 4: Push history to the new repository**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git push -u origin master
 ```
 
@@ -109,7 +106,6 @@ Open the pull request before writing code, so the implementation lands as review
 - [ ] **Step 1: Create the feature branch**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git checkout -b feature/01-skeleton
 ```
 
@@ -138,7 +134,6 @@ Shared schemes live under `*.xcodeproj/xcshareddata/xcschemes/` and must be comm
 - [ ] **Step 3: Verify the scheme path is not ignored**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git check-ignore -v Pastry.xcodeproj/xcshareddata/xcschemes/Pastry.xcscheme; echo "exit=$?"
 ```
 
@@ -147,7 +142,6 @@ Expected: `exit=1` and no output — meaning the path is **not** ignored. If it 
 - [ ] **Step 4: Commit and push the branch**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add .gitignore
 git commit -m "Track shared Xcode schemes, ignore derived data
 
@@ -161,7 +155,6 @@ git push -u origin feature/01-skeleton
 - [ ] **Step 5: Open the draft pull request**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 gh pr create --repo ralph/Pastry --base master --head feature/01-skeleton \
   --draft --title "Feature 1: project skeleton" --body "$(cat <<'BODY'
 First step of the Swift rewrite described in
@@ -197,7 +190,6 @@ Expected: prints the pull request URL. Keep it — later steps push to this bran
 - [ ] **Step 1: Create the source folders**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 mkdir -p Pastry PastryTests Pastry.xcodeproj/xcshareddata/xcschemes
 ```
 
@@ -585,7 +577,6 @@ import Testing
 - [ ] **Step 6: Verify Xcode can parse the project**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -list -project Pastry.xcodeproj
 ```
 
@@ -693,7 +684,6 @@ File `Pastry.xcodeproj/xcshareddata/xcschemes/Pastry.xcscheme`:
 - [ ] **Step 8: Verify the scheme is visible to `xcodebuild`**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -list -project Pastry.xcodeproj | grep -A3 Schemes
 ```
 
@@ -702,7 +692,6 @@ Expected: `Pastry` appears under `Schemes:`.
 - [ ] **Step 9: Build the app**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry -configuration Debug build CODE_SIGNING_ALLOWED=NO 2>&1 | tail -20
 ```
 
@@ -711,7 +700,6 @@ Expected: `** BUILD SUCCEEDED **`.
 - [ ] **Step 10: Run the test target**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry -configuration Debug test 2>&1 | tail -20
 ```
 
@@ -720,7 +708,6 @@ Expected: `** TEST SUCCEEDED **` with one passing test. Note this build signs fo
 - [ ] **Step 11: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry.xcodeproj Pastry PastryTests
 git commit -m "Add Pastry Xcode project and app skeleton
 
@@ -777,7 +764,6 @@ struct MenuBarIconTests {
 - [ ] **Step 2: Run it to make sure it fails**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | tail -20
 ```
 
@@ -811,7 +797,6 @@ enum MenuBarIcon {
 - [ ] **Step 4: Run the tests and make sure they pass**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | tail -20
 ```
 
@@ -855,7 +840,6 @@ struct AppEnvironmentTests {
 - [ ] **Step 6: Run it to make sure it fails**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | tail -20
 ```
 
@@ -893,7 +877,6 @@ enum AppEnvironment {
 - [ ] **Step 8: Run the tests and make sure they pass**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | tail -20
 ```
 
@@ -937,14 +920,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 - [ ] **Step 10: Delete the placeholder test**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 rm PastryTests/PlaceholderTests.swift
 ```
 
 - [ ] **Step 11: Run the tests again**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry test 2>&1 | tail -20
 ```
 
@@ -953,7 +934,6 @@ Expected: `** TEST SUCCEEDED **`, six tests passing, no reference to the deleted
 - [ ] **Step 12: Launch the app and verify it by eye**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 xcodebuild -project Pastry.xcodeproj -scheme Pastry -configuration Debug -derivedDataPath build/dd build 2>&1 | tail -3
 open build/dd/Build/Products/Debug/Pastry.app
 ```
@@ -970,7 +950,6 @@ If the app does appear in the Dock, `INFOPLIST_KEY_LSUIElement` did not make it 
 - [ ] **Step 13: Commit**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add Pastry PastryTests
 git commit -m "Show a scissors status item with a Quit menu
 
@@ -1051,7 +1030,6 @@ Signing is disabled on CI; app-hosted tests still run because the runner allows 
 - [ ] **Step 3: Verify the workflow file parses**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 python3 -c "import yaml,sys; yaml.safe_load(open('.github/workflows/ci.yml')); print('valid YAML')"
 ```
 
@@ -1060,7 +1038,6 @@ Expected: `valid YAML`.
 - [ ] **Step 4: Commit and push the branch**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 git add .github/workflows/ci.yml
 git commit -m "Build and test Pastry on every push and pull request
 
@@ -1071,7 +1048,6 @@ git push
 - [ ] **Step 5: Confirm CI is green**
 
 ```bash
-cd /Users/ralph/code/opensource/Flycut
 gh pr checks --repo ralph/Pastry --watch
 ```
 
