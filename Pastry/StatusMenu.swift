@@ -25,16 +25,62 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSSearchFieldDelegate {
     /// Internal so tests can drive the real text-change path.
     let searchField = NSSearchField()
 
+    /// Lines the field up with the text of the rows above it.
+    private static let searchFieldInset: CGFloat = 12
+    /// Breathing room between the field and the rows on either side.
+    private static let searchFieldPadding: CGFloat = 6
+    private static let searchFieldHeight: CGFloat = 24
+    /// What the row is before a menu width is known, and the floor it keeps
+    /// for a history of very short clippings.
+    private static let minimumSearchWidth: CGFloat = 240
+
     /// Internal so tests can find the row by identity instead of position.
     private(set) lazy var searchFieldItem: NSMenuItem = {
-        let container = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 28))
-        searchField.frame = NSRect(x: 12, y: 2, width: 216, height: 24)
+        let container = NSView(frame: NSRect(
+            x: 0,
+            y: 0,
+            width: Self.minimumSearchWidth,
+            height: Self.searchFieldHeight + Self.searchFieldPadding * 2
+        ))
         searchField.delegate = self
+        // Constrained rather than framed, so widening the container widens
+        // the field with it — see stretchSearchField().
+        searchField.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(searchField)
+        NSLayoutConstraint.activate([
+            searchField.leadingAnchor.constraint(
+                equalTo: container.leadingAnchor, constant: Self.searchFieldInset
+            ),
+            searchField.trailingAnchor.constraint(
+                equalTo: container.trailingAnchor, constant: -Self.searchFieldInset
+            ),
+            searchField.topAnchor.constraint(
+                equalTo: container.topAnchor, constant: Self.searchFieldPadding
+            ),
+            searchField.bottomAnchor.constraint(
+                equalTo: container.bottomAnchor, constant: -Self.searchFieldPadding
+            ),
+        ])
         let item = NSMenuItem()
         item.view = container
         return item
     }()
+
+    /// Widens the field's row to the menu it sits in.
+    ///
+    /// AppKit does not stretch a custom menu-item view to the menu's width —
+    /// measured, and an `autoresizingMask` of `.width` changes nothing — so a
+    /// fixed-width container leaves the field as a narrow island with the
+    /// rows above it running past both its edges. The width is therefore set
+    /// by hand, after the clip rows that decide the menu's width have been
+    /// rebuilt.
+    private func stretchSearchField() {
+        guard let container = searchFieldItem.view else { return }
+        let width = max(menu.size.width, Self.minimumSearchWidth)
+        guard abs(container.frame.width - width) > 0.5 else { return }
+        container.setFrameSize(NSSize(width: width, height: container.frame.height))
+        container.layoutSubtreeIfNeeded()
+    }
 
     /// Whatever held focus in the menu before the field took it, so an arrow
     /// key can hand control back to the rows.
@@ -179,6 +225,10 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSSearchFieldDelegate {
             // a different clip than the one whose title the user read.
             item.representedObject = clip
         }
+
+        // Last, because the rows just rebuilt are what the menu's width is
+        // measured from.
+        stretchSearchField()
     }
 
     @objc private func preferences() {

@@ -84,6 +84,32 @@ struct StatusMenuTests {
         #expect(menu.menu.item(withTitle: "Quit Pastry") != nil)
     }
 
+    /// It used to be a fixed 240-wide island with the rows above it running
+    /// past both edges. AppKit does not stretch a custom menu-item view, so
+    /// the width is set by hand whenever the rows are rebuilt.
+    @Test("the search field row spans the menu")
+    func searchFieldSpansTheMenu() throws {
+        let long = "a clipping long enough to make the menu a good deal wider than the default"
+        let (_, menu) = makeMenu(clips: [long])
+        let container = try #require(menu.searchFieldItem.view)
+
+        #expect(container.frame.width >= menu.menu.size.width - 0.5)
+        #expect(container.frame.width > 240)
+    }
+
+    /// The field is inset inside its row rather than filling it edge to edge,
+    /// so it lines up with the row text and has air above and below.
+    @Test("the search field is inset within its row")
+    func searchFieldIsInset() throws {
+        let (_, menu) = makeMenu(clips: ["a"])
+        let container = try #require(menu.searchFieldItem.view)
+
+        #expect(menu.searchField.frame.width < container.frame.width)
+        #expect(menu.searchField.frame.height < container.frame.height)
+        #expect(menu.searchField.frame.minX > 0)
+        #expect(menu.searchField.frame.minY > 0)
+    }
+
     @Test("Settings uses the standard shortcut and calls back")
     func settingsWiring() {
         let (_, menu) = makeMenu()
