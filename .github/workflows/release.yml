@@ -4,6 +4,11 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for a dry run. Publishes nothing; use a real one to check its changelog notes.'
+        required: false
+        default: '0.0.0'
 
 permissions:
   contents: write
@@ -32,11 +37,15 @@ jobs:
       # The tag is the version, so the tag and the bundle cannot disagree.
       - name: Work out the version
         id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           case "${GITHUB_REF_NAME}" in
             v*) version="${GITHUB_REF_NAME#v}" ;;
-            *)  version="0.0.0" ;;   # a manual run from a branch
+            # A manual run takes whatever was asked for, so a dry run can be
+            # pointed at a real version to check its changelog notes.
+            *)  version="${INPUT_VERSION:-0.0.0}" ;;
           esac
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Building $version"
