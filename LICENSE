@@ -1,4 +1,10 @@
-Copyright (C) 2011, General Arcade, Gennadiy Potapov 
+Copyright (C) 2026 Ralph von der Heyden
+Copyright (C) 2011 General Arcade, Gennadiy Potapov
+
+Pastry is a Swift rewrite of Flycut, which was itself based on Jumpcut. No
+Objective-C from those projects remains, but Pastry reimplements their design
+and lives in a fork of Flycut's repository, so their notice travels with it.
+
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
