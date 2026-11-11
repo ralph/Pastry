@@ -73,6 +73,10 @@ jobs:
           fi
           keychain="$RUNNER_TEMP/build.keychain-db"
           password="$(uuidgen)"
+          # Recorded before the key goes in, not after the setup succeeds:
+          # a failure in between would otherwise leave the cleanup step with
+          # nothing to delete and the private key sitting in a keychain.
+          echo "keychain=$keychain" >> "$GITHUB_OUTPUT"
           security create-keychain -p "$password" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$password" "$keychain"
@@ -87,7 +91,6 @@ jobs:
             -s -k "$password" "$keychain" >/dev/null
           security list-keychains -d user -s "$keychain" \
             $(security list-keychains -d user | tr -d '"')
-          echo "keychain=$keychain" >> "$GITHUB_OUTPUT"
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
       - name: Build
@@ -225,10 +228,17 @@ jobs:
             warning="$warning incomplete, so Gatekeeper will still block this."
             notes="$notes"$'\n\n'"$warning"
           fi
-          # Idempotent: re-running after a flake must not fail on a release
-          # the first attempt already created.
+          # Idempotent for a re-run after a flake, but only while the
+          # release is still a draft: once it is published, people may
+          # already have the DMG, and replacing it silently would swap what
+          # they downloaded for something nobody reviewed.
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG exists; replacing the asset."
+            if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "true" ]; then
+              echo "::error::Release $TAG is already published; refusing to replace it."
+              echo "::error::Delete it, or tag a new version."
+              exit 1
+            fi
+            echo "Draft release $TAG exists; replacing the asset."
             gh release upload "$TAG" "$DMG" --clobber
             gh release edit "$TAG" --notes "$notes"
           else
