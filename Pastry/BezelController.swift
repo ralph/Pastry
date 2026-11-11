@@ -43,6 +43,16 @@ final class BezelController: BezelPanelDelegate {
     }
 
     private func show() {
+        // Carbon matched the whole combination to fire the hotkey, so the
+        // modifiers are held at this instant by definition. Reading them
+        // here is what makes the reconcile at the end safe: if this snapshot
+        // does not show them held, the live state cannot be trusted, and the
+        // reconcile is skipped rather than pasting the moment the bezel
+        // appears. The worst case is the stranded bezel below, not a paste
+        // nobody asked for.
+        let seenHeld = !hotKey.modifiers.isEmpty
+            && NSEvent.modifierFlags.intersection(hotKey.modifiers) == hotKey.modifiers
+
         selection = BezelSelection(count: store.count)
 
         let panel = self.panel ?? BezelPanel(size: BezelView.size)
@@ -80,8 +90,7 @@ final class BezelController: BezelPanelDelegate {
         // once the panel is key closes that window, and makes tapping the
         // hotkey and letting straight go paste the newest clip, which is
         // what the gesture looks like it should do.
-        if !hotKey.modifiers.isEmpty,
-           NSEvent.modifierFlags.intersection(hotKey.modifiers).isEmpty {
+        if seenHeld, NSEvent.modifierFlags.intersection(hotKey.modifiers).isEmpty {
             perform(.paste)
         }
     }
