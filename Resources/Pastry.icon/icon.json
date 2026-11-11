@@ -1,0 +1,205 @@
+{
+  "fill-specializations": [
+    {
+      "value": {
+        "linear-gradient": [
+          "srgb:1.00000,0.94118,0.92157,1.00000",
+          "srgb:1.00000,0.77647,0.80784,1.00000"
+        ],
+        "orientation": {
+          "start": {
+            "x": 0.5,
+            "y": 0
+          },
+          "stop": {
+            "x": 0.5,
+            "y": 1
+          }
+        }
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "linear-gradient": [
+          "srgb:0.36078,0.18824,0.22353,1.00000",
+          "srgb:0.16471,0.07843,0.09804,1.00000"
+        ],
+        "orientation": {
+          "start": {
+            "x": 0.5,
+            "y": 0
+          },
+          "stop": {
+            "x": 0.5,
+            "y": 1
+          }
+        }
+      }
+    }
+  ],
+  "groups": [
+    {
+      "name": "Scissors",
+      "layers": [
+        {
+          "image-name": "scissors-rings.svg",
+          "name": "scissors-rings",
+          "glass": true,
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "srgb:0.20000,0.18039,0.23137,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.65490,0.68627,0.76863,1.00000"
+              }
+            }
+          ]
+        },
+        {
+          "image-name": "scissors-body.svg",
+          "name": "scissors-body",
+          "glass": true,
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "srgb:0.20000,0.18039,0.23137,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.65490,0.68627,0.76863,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "specular": true,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "Garnish",
+      "layers": [
+        {
+          "image-name": "cherry.svg",
+          "name": "cherry",
+          "glass": true,
+          "fill": {
+            "solid": "srgb:0.90980,0.21961,0.29804,1.00000"
+          }
+        },
+        {
+          "image-name": "cherry-stem.svg",
+          "name": "cherry-stem",
+          "glass": false,
+          "fill": {
+            "solid": "srgb:0.30588,0.49804,0.23529,1.00000"
+          }
+        },
+        {
+          "image-name": "pineapple.svg",
+          "name": "pineapple",
+          "glass": true,
+          "fill": {
+            "solid": "srgb:1.00000,0.76863,0.16863,1.00000"
+          }
+        }
+      ],
+      "specular": true,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "Topping",
+      "layers": [
+        {
+          "image-name": "fruit-bits.svg",
+          "name": "fruit-bits",
+          "glass": false,
+          "fill": {
+            "solid": "srgb:1.00000,0.76863,0.16863,1.00000"
+          }
+        },
+        {
+          "image-name": "frosting.svg",
+          "name": "frosting",
+          "glass": true,
+          "fill": {
+            "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+          }
+        }
+      ],
+      "specular": true,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.12
+      }
+    },
+    {
+      "name": "Sponge",
+      "layers": [
+        {
+          "image-name": "cream.svg",
+          "name": "cream",
+          "glass": true,
+          "fill": {
+            "solid": "srgb:1.00000,0.96471,0.90196,1.00000"
+          }
+        },
+        {
+          "image-name": "sponge-top.svg",
+          "name": "sponge-top",
+          "glass": true,
+          "fill": {
+            "solid": "srgb:0.97647,0.84706,0.60784,1.00000"
+          }
+        },
+        {
+          "image-name": "sponge-bottom.svg",
+          "name": "sponge-bottom",
+          "glass": true,
+          "fill": {
+            "solid": "srgb:0.97647,0.84706,0.60784,1.00000"
+          }
+        }
+      ],
+      "specular": true,
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.12
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}

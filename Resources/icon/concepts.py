@@ -213,6 +213,18 @@ def squircle(size=C, n=5.0, steps=76):
         pts.append((a + r*ct, a + r*st))
     return poly(pts)
 
-print(json.dumps({"canvas": C, "squircle": squircle(),
-                  "bg": {"light": COLORWAYS["rose"][0], "dark": COLORWAYS["rose"][1]},
-                  "colorways": COLORWAYS, "concepts": CONCEPTS}))
+def emit():
+    return {"canvas": C, "squircle": squircle(),
+            "bg": {"light": COLORWAYS["rose"][0], "dark": COLORWAYS["rose"][1]},
+            "colorways": COLORWAYS, "concepts": CONCEPTS}
+
+
+def by_id(cid):
+    for c in CONCEPTS:
+        if c["id"] == cid:
+            return c
+    raise KeyError(cid)
+
+
+if __name__ == "__main__":
+    print(json.dumps(emit()))
