@@ -32,6 +32,18 @@ final class ClipStore {
         clips.indices.contains(index) ? clips[index] : nil
     }
 
+    /// The newest clips whose text contains `query`, case-insensitively.
+    ///
+    /// Matches the stored text rather than the row's display text, so a phrase
+    /// split across a line break still matches, and a long clip matches on
+    /// words past the forty characters a row can show.
+    func search(_ query: String, limit: Int) -> [Clip] {
+        let matches = query.isEmpty
+            ? clips
+            : clips.filter { $0.text.localizedCaseInsensitiveContains(query) }
+        return Array(matches.prefix(limit))
+    }
+
     /// Inserts at the top. Text already in the history moves up instead of
     /// being duplicated, carrying the newer app and timestamp with it.
     ///

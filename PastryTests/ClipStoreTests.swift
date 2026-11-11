@@ -143,6 +143,53 @@ struct ClipStoreTests {
         #expect(store.clips.map(\.text) == ["only"])
     }
 
+    @Test("an empty query returns the newest clips up to the limit")
+    func searchWithEmptyQuery() {
+        let store = ClipStore()
+        for text in ["one", "two", "three"] { store.add(Clip.fixture(text)) }
+        #expect(store.search("", limit: 2).map(\.text) == ["three", "two"])
+    }
+
+    @Test("matches anywhere in the text, ignoring case")
+    func searchMatchesSubstringIgnoringCase() {
+        let store = ClipStore()
+        store.add(Clip.fixture("Hello World"))
+        store.add(Clip.fixture("goodbye"))
+        #expect(store.search("LO WO", limit: 10).map(\.text) == ["Hello World"])
+    }
+
+    @Test("keeps newest-first order among matches")
+    func searchKeepsOrder() {
+        let store = ClipStore()
+        store.add(Clip.fixture("alpha one"))
+        store.add(Clip.fixture("beta"))
+        store.add(Clip.fixture("alpha two"))
+        #expect(store.search("alpha", limit: 10).map(\.text) == ["alpha two", "alpha one"])
+    }
+
+    @Test("caps matches at the limit")
+    func searchCapsAtLimit() {
+        let store = ClipStore()
+        for text in ["match 1", "match 2", "match 3"] { store.add(Clip.fixture(text)) }
+        #expect(store.search("match", limit: 2).count == 2)
+    }
+
+    @Test("returns nothing when nothing matches")
+    func searchWithNoMatches() {
+        let store = ClipStore()
+        store.add(Clip.fixture("hello"))
+        #expect(store.search("nothing like it", limit: 10).isEmpty)
+    }
+
+    /// The rows show collapsed whitespace, but the search runs over the real
+    /// text, so a phrase broken across a newline still matches.
+    @Test("matches across the original line breaks")
+    func searchMatchesAcrossNewlines() {
+        let store = ClipStore()
+        store.add(Clip.fixture("first line\nsecond line"))
+        #expect(store.search("second", limit: 10).count == 1)
+    }
+
     @Test("clear empties the history")
     func clearEmpties() {
         let store = ClipStore()

@@ -33,6 +33,15 @@ struct StatusMenuTests {
         clipRows(menu).map(\.title)
     }
 
+    /// Types into the search field through the same delegate callback AppKit
+    /// invokes, rather than a seam that merely imitates it.
+    private func type(_ text: String, into menu: StatusMenu) {
+        menu.searchField.stringValue = text
+        menu.controlTextDidChange(
+            Notification(name: NSControl.textDidChangeNotification, object: menu.searchField)
+        )
+    }
+
     private func choose(_ item: NSMenuItem) {
         _ = item.target?.perform(item.action, with: item)
     }
@@ -132,6 +141,93 @@ struct StatusMenuTests {
         refresh(menu)
 
         #expect(clipTitles(menu) == ["arrived while closed"])
+    }
+
+    @Test("shows a search field below the clip rows")
+    func hasASearchField() throws {
+        let (_, menu) = makeMenu(clips: ["a"])
+        let fieldRow = try #require(menu.menu.items.firstIndex(of: menu.searchFieldItem))
+        let lastClipRow = try #require(menu.menu.items.lastIndex { $0.representedObject is Clip })
+        #expect(fieldRow > lastClipRow)
+    }
+
+    @Test("narrows the rows to clips containing the query")
+    func filtersRows() {
+        let (_, menu) = makeMenu(clips: ["alpha", "beta", "alpha two"])
+        type("alpha", into: menu)
+        #expect(clipTitles(menu) == ["alpha two", "alpha"])
+    }
+
+    @Test("shows a no-match row when the query matches nothing")
+    func noMatchRow() {
+        let (_, menu) = makeMenu(clips: ["alpha"])
+        type("zzz", into: menu)
+        #expect(clipRows(menu).isEmpty)
+        #expect(menu.menu.items.first?.title == "No matches")
+        #expect(menu.menu.items.first?.action == nil)
+    }
+
+    /// A filter that outlived the menu would silently hide clips the next time
+    /// it opened, with nothing on screen explaining why.
+    @Test("forgets the query when the menu closes")
+    func queryResetsOnClose() {
+        let (_, menu) = makeMenu(clips: ["alpha", "beta"])
+        type("alpha", into: menu)
+        #expect(clipTitles(menu) == ["alpha"])
+
+        menu.menuDidClose(menu.menu)
+
+        #expect(menu.query.isEmpty)
+        #expect(menu.searchField.stringValue.isEmpty)
+        #expect(clipTitles(menu) == ["beta", "alpha"])
+    }
+
+    @Test("keeps the empty-history wording when there is nothing at all")
+    func emptyHistoryWordingWins() {
+        let (_, menu) = makeMenu()
+        type("anything", into: menu)
+        #expect(menu.menu.items.first?.title == "No clippings")
+    }
+
+    /// controlTextDidChange is shared across every control the object is a
+    /// delegate for, so it must ignore notifications from anything else.
+    @Test("ignores a text change from another control")
+    func ignoresOtherControls() {
+        let (_, menu) = makeMenu(clips: ["alpha", "beta"])
+        let other = NSSearchField()
+        other.stringValue = "alpha"
+        menu.controlTextDidChange(
+            Notification(name: NSControl.textDidChangeNotification, object: other)
+        )
+        #expect(menu.query.isEmpty)
+        #expect(clipTitles(menu) == ["beta", "alpha"])
+    }
+
+    /// The field's editor swallows arrow keys, so without this a user who
+    /// typed to narrow the list could not reach the row without the mouse.
+    @Test("hands arrow keys back to the menu rows", arguments: [
+        #selector(NSResponder.moveDown(_:)),
+        #selector(NSResponder.moveUp(_:)),
+    ])
+    func arrowKeysLeaveTheSearchField(selector: Selector) {
+        let (_, menu) = makeMenu(clips: ["alpha"])
+        let handled = menu.control(
+            menu.searchField,
+            textView: NSTextView(),
+            doCommandBy: selector
+        )
+        #expect(handled)
+    }
+
+    @Test("leaves other editing commands to the field")
+    func otherCommandsStayInTheField() {
+        let (_, menu) = makeMenu(clips: ["alpha"])
+        let handled = menu.control(
+            menu.searchField,
+            textView: NSTextView(),
+            doCommandBy: #selector(NSResponder.deleteBackward(_:))
+        )
+        #expect(!handled)
     }
 
     @Test("refreshing does not accumulate rows")
