@@ -72,13 +72,18 @@ final class Preferences {
     var hotKey: HotKeyCombination {
         get { storedHotKey }
         set {
-            // Cleared before the early return, not after it. Recording the
-            // same combination again is how a user retries one that was
-            // refused — after quitting whatever had taken it — and a verdict
-            // left standing would outlive the attempt it was about.
+            // Recording the same combination again is how a user retries one
+            // that was refused, after quitting whatever had taken it. That
+            // has to announce a change even though the value is unchanged,
+            // or the early return swallows the retry: the warning would
+            // clear and nothing would be registered. Only a refusal makes an
+            // unchanged value worth announcing.
+            let retryingARefusal = hotKeyIsUnavailable
             hotKeyIsUnavailable = false
-            guard newValue != storedHotKey else { return }
-            previousHotKey = storedHotKey
+            guard newValue != storedHotKey || retryingARefusal else { return }
+
+            // Only a real change has something to go back to.
+            if newValue != storedHotKey { previousHotKey = storedHotKey }
             storedHotKey = newValue
             newValue.write(to: defaults)
             onChange?()

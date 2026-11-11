@@ -127,8 +127,14 @@ struct PreferencesTests {
         preferences.reportHotKeyRefused()
         #expect(preferences.hotKeyIsUnavailable)
 
+        var changes = 0
+        preferences.onChange = { changes += 1 }
         preferences.hotKey = preferences.hotKey
+
         #expect(!preferences.hotKeyIsUnavailable)
+        // The announcement is the retry: without it the warning clears and
+        // nothing is ever registered.
+        #expect(changes == 1)
     }
 
     /// The reverted combination has to be what a relaunch reads back, or the

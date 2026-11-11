@@ -48,6 +48,11 @@ final class KeyRecorderView: NSButton {
 
     @objc private func startRecording() {
         window?.makeFirstResponder(self)
+        // The button toggles its own state on every click. A second click
+        // while already recording would turn it visually off while the
+        // recorder went on listening, so the state is put back to whatever
+        // is actually happening.
+        state = isRecording ? .on : .off
     }
 
     override func becomeFirstResponder() -> Bool {
