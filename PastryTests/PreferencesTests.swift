@@ -1,3 +1,5 @@
+import AppKit
+import Carbon.HIToolbox
 import Foundation
 import Testing
 @testable import Pastry
@@ -45,6 +47,132 @@ struct PreferencesTests {
         let preferences = Preferences(defaults: defaults, loginItem: FakeLoginItem())
         #expect(preferences.rememberCount == 99)
         #expect(preferences.displayCount == 1)
+    }
+
+    @Test("starts at the default hotkey")
+    func defaultHotKey() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        #expect(preferences.hotKey == .commandShiftV)
+        #expect(!preferences.hotKeyIsUnavailable)
+    }
+
+    @Test("remembers a recorded hotkey")
+    func persistsTheHotKey() {
+        let defaults = makeTestDefaults()
+        let chosen = HotKeyCombination(keyCode: UInt16(kVK_ANSI_B), modifiers: [.control, .option])
+
+        let first = Preferences(defaults: defaults, loginItem: FakeLoginItem())
+        first.hotKey = chosen
+
+        let second = Preferences(defaults: defaults, loginItem: FakeLoginItem())
+        #expect(second.hotKey == chosen)
+    }
+
+    @Test("announces a new hotkey so it can be registered")
+    func announcesTheHotKey() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        var changes = 0
+        preferences.onChange = { changes += 1 }
+        preferences.hotKey = HotKeyCombination(keyCode: UInt16(kVK_ANSI_B), modifiers: [.command])
+        #expect(changes == 1)
+    }
+
+    /// Re-registering a Carbon hotkey for a value that did not change would
+    /// be absurd, and the apply path runs on every stepper tick in General.
+    @Test("stays silent when the hotkey is set to what it already is")
+    func silentOnAnUnchangedHotKey() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        var changes = 0
+        preferences.onChange = { changes += 1 }
+        let same = preferences.hotKey
+        preferences.hotKey = same
+        #expect(changes == 0)
+    }
+
+    /// The app is never left without a working hotkey: a refusal puts the
+    /// old one back and says so.
+    @Test("reverts and reports a combination another app already owns")
+    func revertsARefusedHotKey() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        let previous = preferences.hotKey
+        preferences.hotKey = HotKeyCombination(keyCode: UInt16(kVK_ANSI_B), modifiers: [.command])
+
+        preferences.reportHotKeyRefused()
+
+        #expect(preferences.hotKey == previous)
+        #expect(preferences.hotKeyIsUnavailable)
+    }
+
+    /// At launch nothing has been replaced yet, so there is nothing to go
+    /// back to — Pastry simply has no hotkey, and must not pretend the
+    /// refused one is in use by reverting to it.
+    @Test("reports a refusal at launch without inventing a previous one")
+    func refusalWithNothingToRevertTo() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        let atLaunch = preferences.hotKey
+
+        preferences.reportHotKeyRefused()
+
+        #expect(preferences.hotKey == atLaunch)
+        #expect(preferences.hotKeyIsUnavailable)
+    }
+
+    /// A refusal can cure itself: one that failed at launch is retried by
+    /// any later settings change, and when that takes, the warning must not
+    /// go on standing over a hotkey that now works.
+    @Test("clears the warning once the combination registers")
+    func clearsTheWarningOnSuccess() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        preferences.reportHotKeyRefused()
+        #expect(preferences.hotKeyIsUnavailable)
+
+        preferences.reportHotKeyRegistered()
+        #expect(!preferences.hotKeyIsUnavailable)
+    }
+
+    /// Recording the same combination again is how a user retries one that
+    /// was refused, after quitting whatever had taken it. An early return on
+    /// the unchanged value used to swallow the retry and leave the warning
+    /// standing with no way out but recording something else first.
+    @Test("lets the same combination be retried after a refusal")
+    func retriesTheSameCombination() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        preferences.reportHotKeyRefused()
+        #expect(preferences.hotKeyIsUnavailable)
+
+        var changes = 0
+        preferences.onChange = { changes += 1 }
+        preferences.hotKey = preferences.hotKey
+
+        #expect(!preferences.hotKeyIsUnavailable)
+        // The announcement is the retry: without it the warning clears and
+        // nothing is ever registered.
+        #expect(changes == 1)
+    }
+
+    /// The reverted combination has to be what a relaunch reads back, or the
+    /// app would come up registering the one that was refused.
+    @Test("persists the combination it reverted to")
+    func persistsTheRevertedHotKey() {
+        let defaults = makeTestDefaults()
+        let preferences = Preferences(defaults: defaults, loginItem: FakeLoginItem())
+        let previous = preferences.hotKey
+        preferences.hotKey = HotKeyCombination(keyCode: UInt16(kVK_ANSI_B), modifiers: [.command])
+        preferences.reportHotKeyRefused()
+
+        let relaunched = Preferences(defaults: defaults, loginItem: FakeLoginItem())
+        #expect(relaunched.hotKey == previous)
+    }
+
+    /// Otherwise the warning would outlive the combination it was about.
+    @Test("clears the warning once a different combination is recorded")
+    func clearsTheWarning() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        preferences.reportHotKeyRefused()
+        #expect(preferences.hotKeyIsUnavailable)
+
+        preferences.hotKey = HotKeyCombination(keyCode: UInt16(kVK_ANSI_B), modifiers: [.command])
+        #expect(!preferences.hotKeyIsUnavailable)
     }
 
     @Test("announces a change so the app can apply it")

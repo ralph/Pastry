@@ -33,6 +33,7 @@ final class Preferences {
     private var storedRememberCount: Int
     private var storedDisplayCount: Int
     private var storedLaunchAtLogin: Bool
+    private var storedHotKey: HotKeyCombination
 
     var rememberCount: Int {
         get { storedRememberCount }
@@ -67,6 +68,37 @@ final class Preferences {
     /// happens at login until the user allows it.
     private(set) var loginItemNeedsApproval: Bool
 
+    /// The combination that summons the bezel.
+    var hotKey: HotKeyCombination {
+        get { storedHotKey }
+        set {
+            // Recording the same combination again is how a user retries one
+            // that was refused, after quitting whatever had taken it. That
+            // has to announce a change even though the value is unchanged,
+            // or the early return swallows the retry: the warning would
+            // clear and nothing would be registered. Only a refusal makes an
+            // unchanged value worth announcing.
+            let retryingARefusal = hotKeyIsUnavailable
+            hotKeyIsUnavailable = false
+            guard newValue != storedHotKey || retryingARefusal else { return }
+
+            // Only a real change has something to go back to.
+            if newValue != storedHotKey { previousHotKey = storedHotKey }
+            storedHotKey = newValue
+            newValue.write(to: defaults)
+            onChange?()
+        }
+    }
+
+    /// True when the combination the user asked for was already owned by
+    /// another application.
+    private(set) var hotKeyIsUnavailable = false
+
+    /// The last combination that was replaced, so a refusal can go back to
+    /// it. Nil until one is, which is the launch case: there is nothing to
+    /// go back to, and Pastry simply has no hotkey.
+    @ObservationIgnored private var previousHotKey: HotKeyCombination?
+
     init(defaults: UserDefaults = .standard, loginItem: LoginItem) {
         self.defaults = defaults
         self.loginItem = loginItem
@@ -80,6 +112,36 @@ final class Preferences {
         storedDisplayCount = Self.clamp(defaults.integer(forKey: Key.displayCount))
         storedLaunchAtLogin = loginItem.isEnabled
         loginItemNeedsApproval = loginItem.needsApproval
+        storedHotKey = HotKeyCombination(defaults: defaults) ?? .commandShiftV
+    }
+
+    /// Records that Carbon refused the combination, and puts back the one
+    /// that was working before it — if there was one.
+    ///
+    /// Takes no argument: the only moment a previous value exists is inside
+    /// this object's own setter, one line before it is overwritten, so asking
+    /// a caller for it buys nothing and lets a caller with none to give pass
+    /// the refused value back as though it were the good one.
+    ///
+    /// Assigned through the backing property rather than `hotKey`, which
+    /// would clear the very flag being set and announce a change that is
+    /// really the undoing of one.
+    /// Records that the combination is registered.
+    ///
+    /// Needed because a refusal can cure itself: a registration that failed
+    /// at launch is retried on the next settings change of any kind, and
+    /// when that one takes, the warning must not go on standing.
+    func reportHotKeyRegistered() {
+        hotKeyIsUnavailable = false
+        previousHotKey = nil
+    }
+
+    func reportHotKeyRefused() {
+        hotKeyIsUnavailable = true
+        guard let previousHotKey else { return }
+        storedHotKey = previousHotKey
+        previousHotKey.write(to: defaults)
+        self.previousHotKey = nil
     }
 
     /// Reads the system's launch-at-login state back into the mirror.

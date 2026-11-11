@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Preferences window's content. One tab today; feature 9 adds Hotkeys.
+/// The Preferences window's content.
 struct PreferencesView: View {
     @Bindable var preferences: Preferences
 
@@ -8,6 +8,8 @@ struct PreferencesView: View {
         TabView {
             GeneralSettingsView(preferences: preferences)
                 .tabItem { Label("General", systemImage: "gearshape") }
+            HotKeysSettingsView(preferences: preferences)
+                .tabItem { Label("Hotkeys", systemImage: "keyboard") }
         }
         .padding(20)
         .frame(width: 440)

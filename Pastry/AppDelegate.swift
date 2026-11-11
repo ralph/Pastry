@@ -65,6 +65,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let preferences else { return }
         store.rememberCount = preferences.rememberCount
         statusMenu?.displayCount = preferences.displayCount
+
+        // onChange carries no payload, so this also runs for every tick of a
+        // stepper in the General tab. registerHotKey is idempotent and
+        // returns early when the combination is already the registered one,
+        // so no Carbon call happens for a change that was not about it.
+        if registerHotKey(preferences.hotKey) {
+            // Clears a warning from a registration that has since started
+            // working — one refused at launch is retried by any later
+            // settings change, and may well take.
+            preferences.reportHotKeyRegistered()
+        } else {
+            preferences.reportHotKeyRefused()
+        }
     }
 
     private func showPreferences() {
@@ -203,9 +216,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installBezel() {
         // One value for the combination, shared by the registration and by
         // the bezel, which has to know which key walks the history and which
-        // modifiers releasing ends the interaction. Feature 9 makes it
-        // configurable, and this is the single place it will come from.
-        let combination = HotKeyCombination.commandShiftV
+        // modifiers releasing ends the interaction.
+        let combination = preferences?.hotKey ?? .commandShiftV
 
         let bezel = BezelController(
             store: store,
@@ -215,17 +227,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.bezel = bezel
 
-        // A nil hotkey means the combination is already taken; HotKey logs
-        // the reason. The menu still works, so this is not fatal.
-        hotKey = HotKey(combination: combination) { [weak self] in
-            guard let self else { return }
-            // A paste in flight sends ⌘V to whatever window is key once the
-            // focus handoff has settled. Showing the bezel now would make it
-            // that window, so the keystroke would walk its history instead
-            // of pasting and the clip would go nowhere. The wait is 0.2 s.
-            guard paster?.isPasting != true else { return }
-            bezel.hotKeyPressed()
+        if registerHotKey(combination) {
+            preferences?.reportHotKeyRegistered()
+        } else {
+            // The menu still works, so this is not fatal — but the Hotkeys
+            // tab has to say so.
+            Log.clipboard.error("could not register the hotkey")
+            preferences?.reportHotKeyRefused()
         }
+    }
+
+    /// Makes the registration match `combination`, releasing whatever was
+    /// registered before it.
+    ///
+    /// Idempotent, and the only thing that decides whether work is needed:
+    /// `HotKey` records what it registered, so this asks the registration
+    /// rather than some other object's copy of the answer.
+    ///
+    /// The new one is registered *first*. Carbon is the only thing that knows
+    /// whether another application already owns a combination, and releasing
+    /// the old one first would mean a refusal left Pastry with no hotkey at
+    /// all. Two different combinations never collide — which the guard above
+    /// guarantees — so both can be live for the instant in between.
+    ///
+    /// - Returns: whether the combination is registered when this returns.
+    private func registerHotKey(_ combination: HotKeyCombination) -> Bool {
+        guard combination != hotKey?.combination else { return true }
+        guard let replacement = HotKey(combination: combination, onPress: { [weak self] in
+            self?.hotKeyPressed()
+        }) else {
+            return false
+        }
+        hotKey?.unregister()
+        hotKey = replacement
+        bezel?.hotKey = combination
+        return true
+    }
+
+    private func hotKeyPressed() {
+        // A paste in flight sends ⌘V to whatever window is key once the focus
+        // handoff has settled. Showing the bezel now would make it that
+        // window, so the keystroke would walk its history instead of pasting
+        // and the clip would go nowhere. The wait is 0.2 s.
+        guard paster?.isPasting != true else { return }
+        bezel?.hotKeyPressed()
     }
 
     /// Pastes a chosen clip into the application the user came from.
