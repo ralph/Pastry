@@ -97,10 +97,38 @@ struct PreferencesTests {
         let previous = preferences.hotKey
         preferences.hotKey = HotKeyCombination(keyCode: UInt16(kVK_ANSI_B), modifiers: [.command])
 
-        preferences.reportHotKeyRefused(revertingTo: previous)
+        preferences.reportHotKeyRefused()
 
         #expect(preferences.hotKey == previous)
         #expect(preferences.hotKeyIsUnavailable)
+    }
+
+    /// At launch nothing has been replaced yet, so there is nothing to go
+    /// back to — Pastry simply has no hotkey, and must not pretend the
+    /// refused one is in use by reverting to it.
+    @Test("reports a refusal at launch without inventing a previous one")
+    func refusalWithNothingToRevertTo() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        let atLaunch = preferences.hotKey
+
+        preferences.reportHotKeyRefused()
+
+        #expect(preferences.hotKey == atLaunch)
+        #expect(preferences.hotKeyIsUnavailable)
+    }
+
+    /// Recording the same combination again is how a user retries one that
+    /// was refused, after quitting whatever had taken it. An early return on
+    /// the unchanged value used to swallow the retry and leave the warning
+    /// standing with no way out but recording something else first.
+    @Test("lets the same combination be retried after a refusal")
+    func retriesTheSameCombination() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        preferences.reportHotKeyRefused()
+        #expect(preferences.hotKeyIsUnavailable)
+
+        preferences.hotKey = preferences.hotKey
+        #expect(!preferences.hotKeyIsUnavailable)
     }
 
     /// The reverted combination has to be what a relaunch reads back, or the
@@ -111,7 +139,7 @@ struct PreferencesTests {
         let preferences = Preferences(defaults: defaults, loginItem: FakeLoginItem())
         let previous = preferences.hotKey
         preferences.hotKey = HotKeyCombination(keyCode: UInt16(kVK_ANSI_B), modifiers: [.command])
-        preferences.reportHotKeyRefused(revertingTo: previous)
+        preferences.reportHotKeyRefused()
 
         let relaunched = Preferences(defaults: defaults, loginItem: FakeLoginItem())
         #expect(relaunched.hotKey == previous)
@@ -121,7 +149,7 @@ struct PreferencesTests {
     @Test("clears the warning once a different combination is recorded")
     func clearsTheWarning() {
         let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
-        preferences.reportHotKeyRefused(revertingTo: preferences.hotKey)
+        preferences.reportHotKeyRefused()
         #expect(preferences.hotKeyIsUnavailable)
 
         preferences.hotKey = HotKeyCombination(keyCode: UInt16(kVK_ANSI_B), modifiers: [.command])

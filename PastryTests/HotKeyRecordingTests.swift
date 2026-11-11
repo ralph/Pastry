@@ -36,17 +36,6 @@ struct HotKeyRecordingTests {
         #expect(outcome(kVK_ANSI_V, [.shift]) == .needsAModifier)
     }
 
-    /// Holding ⌘ before pressing the key is how recording always starts, so
-    /// a modifier arriving on its own is not an attempt at anything.
-    @Test("ignores a modifier pressed on its own", arguments: [
-        kVK_Command, kVK_Shift, kVK_Option, kVK_Control,
-        kVK_RightCommand, kVK_RightShift, kVK_RightOption, kVK_RightControl,
-        kVK_Function, kVK_CapsLock,
-    ])
-    func ignoresModifiersAlone(keyCode: Int) {
-        #expect(outcome(keyCode, [.command]) == .ignored)
-    }
-
     /// Caps lock, fn and the numeric-pad flag ride along on ordinary events.
     /// Stored, they would make a combination Carbon could never match again.
     @Test("keeps only the modifiers Carbon can register")

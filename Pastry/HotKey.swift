@@ -9,8 +9,25 @@ import Carbon.HIToolbox
 /// 9 lets the user change it, and a hand-written copy of ⇧⌘V anywhere else
 /// would go on answering for a combination nobody chose any more.
 struct HotKeyCombination: Equatable {
+    /// The only modifiers Carbon can register.
+    ///
+    /// Caps lock, fn and the numeric-pad flag ride along on ordinary key
+    /// events. Kept in a combination they would make one that can never be
+    /// matched again: with caps lock on, the bezel's release check would
+    /// never see the modifiers go empty, and it would never paste.
+    static let registrableModifiers: NSEvent.ModifierFlags =
+        [.command, .control, .option, .shift]
+
     let keyCode: UInt16
     let modifiers: NSEvent.ModifierFlags
+
+    /// Filters the modifiers on the way in, so that no combination anywhere
+    /// — recorded, read back from defaults, or written by hand with
+    /// `defaults write` — can carry one Carbon will not register.
+    init(keyCode: UInt16, modifiers: NSEvent.ModifierFlags) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers.intersection(Self.registrableModifiers)
+    }
 
     /// The combination Flycut used, and Pastry's default.
     static let commandShiftV = HotKeyCombination(
@@ -45,8 +62,13 @@ final class HotKey {
     private let id: UInt32
     private var reference: EventHotKeyRef?
 
+    /// What this registration is for, so nothing else has to keep a record
+    /// of what is actually registered.
+    let combination: HotKeyCombination
+
     init?(combination: HotKeyCombination, onPress: @escaping () -> Void) {
         guard Self.installHandlerIfNeeded() else { return nil }
+        self.combination = combination
 
         id = Self.nextID
         Self.nextID += 1
@@ -144,10 +166,12 @@ extension HotKeyCombination {
     /// cannot be used. These are ordinary defaults keys and anything at all
     /// can have written them.
     init?(defaults: UserDefaults) {
-        guard defaults.object(forKey: Key.keyCode) != nil,
-              defaults.object(forKey: Key.modifiers) != nil else { return nil }
+        // Only the key code's presence is load-bearing: absent it reads as 0,
+        // which is a real key. Absent modifiers read as none, which the
+        // usability guard below rejects anyway.
+        guard let keyCode = defaults.object(forKey: Key.keyCode) as? Int else { return nil }
         let stored = HotKeyCombination(
-            keyCode: UInt16(truncatingIfNeeded: defaults.integer(forKey: Key.keyCode)),
+            keyCode: UInt16(truncatingIfNeeded: keyCode),
             modifiers: NSEvent.ModifierFlags(
                 rawValue: UInt(bitPattern: defaults.integer(forKey: Key.modifiers))
             )
@@ -181,7 +205,7 @@ extension HotKeyCombination {
     /// The keys that carry no character of their own.
     private static let specialKeyNames: [Int: String] = [
         kVK_Space: "Space", kVK_Return: "Return", kVK_ANSI_KeypadEnter: "Enter",
-        kVK_Tab: "Tab", kVK_Escape: "Escape", kVK_Delete: "Delete",
+        kVK_Tab: "Tab", kVK_Escape: "Escape", kVK_Delete: "⌫",
         kVK_ForwardDelete: "⌦", kVK_Home: "Home", kVK_End: "End",
         kVK_PageUp: "Page Up", kVK_PageDown: "Page Down",
         kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑", kVK_DownArrow: "↓",

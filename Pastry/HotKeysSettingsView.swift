@@ -29,7 +29,11 @@ struct HotKeysSettingsView: View {
     private var footerText: String {
         if let rejection { return rejection }
         if preferences.hotKeyIsUnavailable {
-            return "Another app is already using that combination, so the previous one is still in use."
+            // Deliberately says nothing about what is registered instead.
+            // Usually the previous combination still is — but when the very
+            // first one was refused at launch there is no previous one, and
+            // Pastry has no hotkey at all.
+            return "Another app is already using that combination. Try a different one."
         }
         return "Hold the modifiers and tap the key to walk back through the history. Let go to paste."
     }
@@ -43,8 +47,6 @@ struct HotKeysSettingsView: View {
             rejection = nil
         case .needsAModifier:
             rejection = "A hotkey needs ⌘, ⌃ or ⌥ — without one it would fire as you type."
-        case .ignored:
-            break
         }
     }
 }

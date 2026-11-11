@@ -41,6 +41,27 @@ struct HotKeyCombinationTests {
         #expect(HotKeyCombination(defaults: defaults) == nil)
     }
 
+    /// The filter lives in the initialiser, so no combination anywhere can
+    /// carry a modifier Carbon will not register — however it was built.
+    /// With caps lock kept, the bezel's release check would never see the
+    /// modifiers go empty and it would never paste.
+    @Test("drops modifiers Carbon cannot register, however it is built")
+    func filtersOnConstruction() {
+        let built = HotKeyCombination(
+            keyCode: UInt16(kVK_ANSI_V),
+            modifiers: [.command, .capsLock, .function, .numericPad]
+        )
+        #expect(built.modifiers == [.command])
+
+        let defaults = makeTestDefaults()
+        defaults.set(Int(kVK_ANSI_V), forKey: "hotKeyKeyCode")
+        defaults.set(
+            Int(bitPattern: NSEvent.ModifierFlags([.command, .capsLock]).rawValue),
+            forKey: "hotKeyModifiers"
+        )
+        #expect(HotKeyCombination(defaults: defaults)?.modifiers == [.command])
+    }
+
     @Test("needs one of command, control or option", arguments: [
         (NSEvent.ModifierFlags([.command]), true),
         (NSEvent.ModifierFlags([.control]), true),
@@ -69,7 +90,7 @@ struct HotKeyCombinationTests {
 
     @Test("names keys that have no character", arguments: [
         (kVK_Space, "Space"), (kVK_Return, "Return"), (kVK_Escape, "Escape"),
-        (kVK_LeftArrow, "←"), (kVK_F1, "F1"), (kVK_Delete, "Delete"),
+        (kVK_LeftArrow, "←"), (kVK_F1, "F1"), (kVK_Delete, "⌫"),
         (kVK_PageUp, "Page Up"),
     ])
     func specialKeyNames(keyCode: Int, name: String) {

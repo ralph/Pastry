@@ -72,18 +72,27 @@ final class Preferences {
     var hotKey: HotKeyCombination {
         get { storedHotKey }
         set {
-            guard newValue != storedHotKey else { return }
-            storedHotKey = newValue
-            // A fresh choice is not the refused one, whatever happened last.
+            // Cleared before the early return, not after it. Recording the
+            // same combination again is how a user retries one that was
+            // refused — after quitting whatever had taken it — and a verdict
+            // left standing would outlive the attempt it was about.
             hotKeyIsUnavailable = false
+            guard newValue != storedHotKey else { return }
+            previousHotKey = storedHotKey
+            storedHotKey = newValue
             newValue.write(to: defaults)
             onChange?()
         }
     }
 
     /// True when the combination the user asked for was already owned by
-    /// another application. The previous one stays registered.
+    /// another application.
     private(set) var hotKeyIsUnavailable = false
+
+    /// The last combination that was replaced, so a refusal can go back to
+    /// it. Nil until one is, which is the launch case: there is nothing to
+    /// go back to, and Pastry simply has no hotkey.
+    @ObservationIgnored private var previousHotKey: HotKeyCombination?
 
     init(defaults: UserDefaults = .standard, loginItem: LoginItem) {
         self.defaults = defaults
@@ -101,15 +110,23 @@ final class Preferences {
         storedHotKey = HotKeyCombination(defaults: defaults) ?? .commandShiftV
     }
 
-    /// Puts the working combination back after Carbon refused the new one.
+    /// Records that Carbon refused the combination, and puts back the one
+    /// that was working before it — if there was one.
+    ///
+    /// Takes no argument: the only moment a previous value exists is inside
+    /// this object's own setter, one line before it is overwritten, so asking
+    /// a caller for it buys nothing and lets a caller with none to give pass
+    /// the refused value back as though it were the good one.
     ///
     /// Assigned through the backing property rather than `hotKey`, which
-    /// would clear the very flag being set, and would announce a change that
-    /// is really the undoing of one.
-    func reportHotKeyRefused(revertingTo previous: HotKeyCombination) {
-        storedHotKey = previous
-        previous.write(to: defaults)
+    /// would clear the very flag being set and announce a change that is
+    /// really the undoing of one.
+    func reportHotKeyRefused() {
         hotKeyIsUnavailable = true
+        guard let previousHotKey else { return }
+        storedHotKey = previousHotKey
+        previousHotKey.write(to: defaults)
+        self.previousHotKey = nil
     }
 
     /// Reads the system's launch-at-login state back into the mirror.

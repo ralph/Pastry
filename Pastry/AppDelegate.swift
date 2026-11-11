@@ -66,14 +66,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.rememberCount = preferences.rememberCount
         statusMenu?.displayCount = preferences.displayCount
 
-        // Compared against what is actually registered rather than acted on
-        // blindly: onChange carries no payload, so this runs for every tick
-        // of a stepper in the General tab too, and re-registering a Carbon
-        // hotkey for an unchanged value would be absurd.
-        guard let bezel, preferences.hotKey != bezel.hotKey else { return }
-        let previous = bezel.hotKey
+        // onChange carries no payload, so this also runs for every tick of a
+        // stepper in the General tab. registerHotKey is idempotent and
+        // returns early when the combination is already the registered one,
+        // so no Carbon call happens for a change that was not about it.
         if !registerHotKey(preferences.hotKey) {
-            preferences.reportHotKeyRefused(revertingTo: previous)
+            preferences.reportHotKeyRefused()
         }
     }
 
@@ -228,20 +226,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Already owned by another application. The menu still works, so
             // this is not fatal — but the Hotkeys tab has to say so.
             Log.clipboard.error("the hotkey is unavailable; another app may already own it")
-            preferences?.reportHotKeyRefused(revertingTo: combination)
+            preferences?.reportHotKeyRefused()
         }
     }
 
-    /// Registers `combination`, releasing whatever was registered before it.
+    /// Makes the registration match `combination`, releasing whatever was
+    /// registered before it.
+    ///
+    /// Idempotent, and the only thing that decides whether work is needed:
+    /// `HotKey` records what it registered, so this asks the registration
+    /// rather than some other object's copy of the answer.
     ///
     /// The new one is registered *first*. Carbon is the only thing that knows
     /// whether another application already owns a combination, and releasing
     /// the old one first would mean a refusal left Pastry with no hotkey at
-    /// all. Two different combinations never collide, so both can be live for
-    /// the instant in between.
+    /// all. Two different combinations never collide — which the guard above
+    /// guarantees — so both can be live for the instant in between.
     ///
-    /// - Returns: whether the new combination took.
+    /// - Returns: whether the combination is registered when this returns.
     private func registerHotKey(_ combination: HotKeyCombination) -> Bool {
+        guard combination != hotKey?.combination else { return true }
         guard let replacement = HotKey(combination: combination, onPress: { [weak self] in
             self?.hotKeyPressed()
         }) else {

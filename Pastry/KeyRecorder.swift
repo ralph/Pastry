@@ -3,23 +3,52 @@ import SwiftUI
 
 /// The control that listens for a combination.
 ///
-/// An `NSView` rather than anything SwiftUI offers, because it has to see key
-/// events *before* they are interpreted. While it is recording it also takes
-/// over `performKeyEquivalent(with:)`: without that, pressing ⌘Q to record it
-/// would quit Pastry and ⌘W would close the window, instead of either being
-/// recorded.
-final class KeyRecorderView: NSView {
+/// An `NSButton` subclass rather than a hand-drawn view: it brings the focus
+/// ring, the pressed state, the contrast and transparency settings, and — the
+/// part a custom view silently loses — a role and a title for VoiceOver.
+///
+/// What it does add is seeing keys before anything else interprets them.
+/// `keyDown(with:)` is taken while recording, and so is
+/// `performKeyEquivalent(with:)`: without the latter, recording ⌘Q would quit
+/// Pastry and ⌘W would close the window instead of either being recorded.
+final class KeyRecorderView: NSButton {
     var onOutcome: ((HotKeyRecordingOutcome) -> Void)?
 
-    /// What to draw when not recording.
-    var title = "" { didSet { needsDisplay = true } }
-
-    private(set) var isRecording = false {
-        didSet { needsDisplay = true }
+    /// What to show when not recording.
+    var combinationTitle = "" {
+        didSet {
+            guard combinationTitle != oldValue else { return }
+            refreshTitle()
+        }
     }
 
+    private var isRecording = false {
+        didSet {
+            guard isRecording != oldValue else { return }
+            state = isRecording ? .on : .off
+            refreshTitle()
+        }
+    }
+
+    // NSControl only takes first responder when full keyboard access is on,
+    // and this control is useless if it cannot.
     override var acceptsFirstResponder: Bool { true }
-    override var isOpaque: Bool { false }
+
+    init() {
+        super.init(frame: .zero)
+        bezelStyle = .rounded
+        setButtonType(.pushOnPushOff)
+        target = self
+        action = #selector(startRecording)
+        refreshTitle()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    @objc private func startRecording() {
+        window?.makeFirstResponder(self)
+    }
 
     override func becomeFirstResponder() -> Bool {
         isRecording = true
@@ -31,10 +60,6 @@ final class KeyRecorderView: NSView {
         return super.resignFirstResponder()
     }
 
-    override func mouseDown(with event: NSEvent) {
-        window?.makeFirstResponder(self)
-    }
-
     override func keyDown(with event: NSEvent) {
         guard isRecording else {
             super.keyDown(with: event)
@@ -44,9 +69,8 @@ final class KeyRecorderView: NSView {
             keyCode: event.keyCode,
             modifiers: event.modifierFlags
         )
-        // A modifier on its own is how every recording starts, so it leaves
-        // the recorder listening. Everything else is conclusive.
-        guard outcome != .ignored else { return }
+        // Every outcome is conclusive: a modifier on its own arrives through
+        // flagsChanged, which this never sees.
         window?.makeFirstResponder(nil)
         onOutcome?(outcome)
     }
@@ -59,25 +83,8 @@ final class KeyRecorderView: NSView {
         return true
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        let rounded = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 6, yRadius: 6)
-        (isRecording ? NSColor.controlAccentColor.withAlphaComponent(0.15)
-                     : NSColor.unemphasizedSelectedContentBackgroundColor).setFill()
-        rounded.fill()
-        (isRecording ? NSColor.controlAccentColor : NSColor.separatorColor).setStroke()
-        rounded.lineWidth = isRecording ? 2 : 1
-        rounded.stroke()
-
-        let text = isRecording ? "Press a combination…" : title
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: NSFont.systemFontSize),
-            .foregroundColor: isRecording ? NSColor.secondaryLabelColor : NSColor.labelColor,
-        ]
-        let size = (text as NSString).size(withAttributes: attributes)
-        (text as NSString).draw(
-            at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2),
-            withAttributes: attributes
-        )
+    private func refreshTitle() {
+        title = isRecording ? "Press a combination…" : combinationTitle
     }
 }
 
@@ -88,13 +95,13 @@ struct KeyRecorder: NSViewRepresentable {
 
     func makeNSView(context: Context) -> KeyRecorderView {
         let view = KeyRecorderView()
-        view.title = title
+        view.combinationTitle = title
         view.onOutcome = onOutcome
         return view
     }
 
     func updateNSView(_ view: KeyRecorderView, context: Context) {
-        view.title = title
+        view.combinationTitle = title
         view.onOutcome = onOutcome
     }
 }

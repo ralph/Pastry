@@ -133,10 +133,12 @@ final class BezelController: BezelPanelDelegate {
     func bezelPanel(_ panel: BezelPanel, didChangeFlags event: NSEvent) {
         guard isShowing else { return }
         // Letting go of the modifiers is the primary way to paste: the user
-        // held ⌘⇧, tapped to the clip they wanted, and let go. A combination
-        // with no modifiers at all has nothing to let go of, so it pastes
-        // with Return instead — without this guard the first flagsChanged
-        // after opening would paste immediately.
+        // held ⌘⇧, tapped to the clip they wanted, and let go. Kept as a
+        // guard although feature 9 made it unreachable — every combination
+        // now carries one of ⌘ ⌃ ⌥, enforced where they are built — because
+        // what it prevents is the first flagsChanged after opening pasting
+        // immediately, and that is too quiet a failure to leave to an
+        // invariant held somewhere else.
         guard !hotKey.modifiers.isEmpty else { return }
         if event.modifierFlags.intersection(hotKey.modifiers).isEmpty {
             perform(.paste)
