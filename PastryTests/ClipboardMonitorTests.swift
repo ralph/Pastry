@@ -6,15 +6,25 @@ import Testing
 @MainActor
 private final class FakeClipboard: ClipboardSource {
     var changeCount = 0
-    var types: [String] = ["public.utf8-plain-text"]
     private var contents: String?
+    private var presentTypes: Set<String> = ["public.utf8-plain-text"]
+
+    func hasType(_ type: String) -> Bool { presentTypes.contains(type) }
 
     func string() -> String? { contents }
 
-    /// Mimics a copy: new contents and a bumped change count.
-    func copy(_ text: String?, types: [String] = ["public.utf8-plain-text"]) {
+    @discardableResult
+    func write(_ text: String) -> Int {
         contents = text
-        self.types = types
+        presentTypes = ["public.utf8-plain-text"]
+        changeCount += 1
+        return changeCount
+    }
+
+    /// Mimics another application copying: new contents and a bumped count.
+    func copy(_ text: String?, types: Set<String> = ["public.utf8-plain-text"]) {
+        contents = text
+        presentTypes = types
         changeCount += 1
     }
 }
@@ -22,92 +32,142 @@ private final class FakeClipboard: ClipboardSource {
 @Suite("ClipboardMonitor")
 @MainActor
 struct ClipboardMonitorTests {
-    final class Box { var captured: [String] = [] }
+    private let epoch = Date(timeIntervalSince1970: 1_700_000_000)
 
-    private func makeMonitor() -> (FakeClipboard, ClipboardMonitor, Box) {
+    private func makeMonitor(
+        app: SourceApp? = SourceApp(name: "Safari", bundleURL: nil),
+        onCapture: @escaping (Clip) -> Void
+    ) -> (FakeClipboard, ClipboardMonitor) {
         let clipboard = FakeClipboard()
-        let box = Box()
-        let monitor = ClipboardMonitor(source: clipboard) { box.captured.append($0) }
-        return (clipboard, monitor, box)
+        let monitor = ClipboardMonitor(
+            source: clipboard,
+            frontmostApp: { app },
+            now: { Date(timeIntervalSince1970: 1_700_000_000) },
+            onCapture: onCapture
+        )
+        return (clipboard, monitor)
     }
 
     @Test("captures nothing when the pasteboard has not changed")
     func noChangeNoCapture() {
-        let (_, monitor, box) = makeMonitor()
+        var captured: [Clip] = []
+        let (_, monitor) = makeMonitor { captured.append($0) }
         monitor.poll()
         monitor.poll()
-        #expect(box.captured.isEmpty)
+        #expect(captured.isEmpty)
     }
 
     @Test("captures newly copied text")
     func capturesNewText() {
-        let (clipboard, monitor, box) = makeMonitor()
+        var captured: [Clip] = []
+        let (clipboard, monitor) = makeMonitor { captured.append($0) }
         clipboard.copy("hello")
         monitor.poll()
-        #expect(box.captured == ["hello"])
+        #expect(captured.map(\.text) == ["hello"])
+    }
+
+    @Test("stamps the captured clip with the frontmost app and the current time")
+    func stampsSourceAndTime() {
+        var captured: [Clip] = []
+        let url = URL(fileURLWithPath: "/Applications/Safari.app")
+        let (clipboard, monitor) = makeMonitor(
+            app: SourceApp(name: "Safari", bundleURL: url)
+        ) { captured.append($0) }
+        clipboard.copy("hello")
+        monitor.poll()
+        #expect(captured.first?.appName == "Safari")
+        #expect(captured.first?.appBundleURL == url)
+        #expect(captured.first?.date == epoch)
+    }
+
+    @Test("captures even when the frontmost app cannot be identified")
+    func capturesWithoutAnIdentifiableApp() {
+        var captured: [Clip] = []
+        let (clipboard, monitor) = makeMonitor(app: nil) { captured.append($0) }
+        clipboard.copy("hello")
+        monitor.poll()
+        #expect(captured.map(\.text) == ["hello"])
+        #expect(captured.first?.appName == nil)
     }
 
     @Test("captures one copy only once however often it polls")
     func capturesEachChangeOnce() {
-        let (clipboard, monitor, box) = makeMonitor()
+        var captured: [Clip] = []
+        let (clipboard, monitor) = makeMonitor { captured.append($0) }
         clipboard.copy("hello")
         monitor.poll()
         monitor.poll()
         monitor.poll()
-        #expect(box.captured == ["hello"])
+        #expect(captured.map(\.text) == ["hello"])
     }
 
     @Test("skips a clip the source marked concealed")
     func skipsConcealedClip() {
-        let (clipboard, monitor, box) = makeMonitor()
+        var captured: [Clip] = []
+        let (clipboard, monitor) = makeMonitor { captured.append($0) }
         clipboard.copy("hunter2", types: ["public.utf8-plain-text", "org.nspasteboard.ConcealedType"])
         monitor.poll()
-        #expect(box.captured.isEmpty)
+        #expect(captured.isEmpty)
     }
 
     @Test("keeps working after a concealed clip")
     func recoversAfterConcealedClip() {
-        let (clipboard, monitor, box) = makeMonitor()
+        var captured: [Clip] = []
+        let (clipboard, monitor) = makeMonitor { captured.append($0) }
         clipboard.copy("hunter2", types: ["org.nspasteboard.ConcealedType"])
         monitor.poll()
         clipboard.copy("ordinary")
         monitor.poll()
-        #expect(box.captured == ["ordinary"])
+        #expect(captured.map(\.text) == ["ordinary"])
     }
 
     @Test("skips a change carrying no text")
     func skipsNonText() {
-        let (clipboard, monitor, box) = makeMonitor()
+        var captured: [Clip] = []
+        let (clipboard, monitor) = makeMonitor { captured.append($0) }
         clipboard.copy(nil, types: ["public.png"])
         monitor.poll()
-        #expect(box.captured.isEmpty)
+        #expect(captured.isEmpty)
     }
 
     @Test("skips empty text")
     func skipsEmptyText() {
-        let (clipboard, monitor, box) = makeMonitor()
+        var captured: [Clip] = []
+        let (clipboard, monitor) = makeMonitor { captured.append($0) }
         clipboard.copy("")
         monitor.poll()
-        #expect(box.captured.isEmpty)
+        #expect(captured.isEmpty)
     }
 
-    @Test("ignores the clip Pastry put on the pasteboard itself")
+    @Test("does not record the clip it wrote itself")
     func ignoresOwnWrite() {
-        let (clipboard, monitor, box) = makeMonitor()
-        clipboard.copy("pasted by Pastry")
-        monitor.ignoreCurrentContents()
+        var captured: [Clip] = []
+        let (_, monitor) = makeMonitor { captured.append($0) }
+        monitor.write("pasted by Pastry")
         monitor.poll()
-        #expect(box.captured.isEmpty)
+        #expect(captured.isEmpty)
     }
 
     @Test("captures the next real copy after one of its own writes")
     func capturesAfterOwnWrite() {
-        let (clipboard, monitor, box) = makeMonitor()
-        clipboard.copy("pasted by Pastry")
-        monitor.ignoreCurrentContents()
+        var captured: [Clip] = []
+        let (clipboard, monitor) = makeMonitor { captured.append($0) }
+        monitor.write("pasted by Pastry")
         monitor.poll()
         clipboard.copy("typed by the user")
         monitor.poll()
-        #expect(box.captured == ["typed by the user"])
+        #expect(captured.map(\.text) == ["typed by the user"])
+    }
+
+    /// The old two-step contract — write, then suppress — could swallow a copy
+    /// the user made in between. Writing and suppressing are now one call.
+    @Test("a copy racing its own write is still captured")
+    func doesNotSwallowACopyRacingTheWrite() {
+        var captured: [Clip] = []
+        let (clipboard, monitor) = makeMonitor { captured.append($0) }
+        monitor.write("pasted by Pastry")
+        clipboard.copy("user copied this a moment later")
+        monitor.poll()
+        #expect(captured.map(\.text) == ["user copied this a moment later"])
     }
 }

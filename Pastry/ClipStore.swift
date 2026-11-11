@@ -2,10 +2,10 @@ import Foundation
 
 /// The clipboard history, newest first.
 ///
-/// Every rule about what the list contains lives here: duplicates move to the
-/// top rather than piling up, empty text is never stored, and the list is
-/// capped. Nothing in here touches AppKit or the pasteboard, so it is all
-/// directly testable.
+/// Every rule about what the *list* contains lives here: duplicates move to the
+/// top rather than piling up, clips with nothing to show are never stored, and
+/// the list is capped. Nothing in here touches AppKit or the pasteboard, so it
+/// is all directly testable.
 @MainActor
 final class ClipStore {
     private(set) var clips: [Clip] = []
@@ -27,15 +27,18 @@ final class ClipStore {
 
     /// Inserts at the top. Text already in the history moves up instead of
     /// being duplicated, carrying the newer app and timestamp with it.
+    ///
+    /// Clips whose display text is empty — blank or whitespace only — are
+    /// rejected: they would occupy a history slot and draw an empty menu row.
     func add(_ clip: Clip) {
-        guard !clip.text.isEmpty else { return }
+        guard !clip.displayText.isEmpty else { return }
         clips.removeAll { $0.text == clip.text }
         clips.insert(clip, at: 0)
         trim()
     }
 
     func remove(at index: Int) {
-        guard clips.indices.contains(index) else { return }
+        guard clip(at: index) != nil else { return }
         clips.remove(at: index)
     }
 
@@ -44,8 +47,12 @@ final class ClipStore {
     }
 
     /// Joins every clip, oldest first, into one new clip at the top.
+    ///
+    /// Below two clips there is nothing to join, and merging anyway would
+    /// replace the lone clip's source app and timestamp with Pastry's own —
+    /// losing attribution the bezel displays, in exchange for nothing.
     func merge() {
-        guard !clips.isEmpty else { return }
+        guard clips.count > 1 else { return }
         let merged = clips.reversed().map(\.text).joined(separator: "\n")
         add(Clip(text: merged, appName: "Pastry", appBundleURL: nil, date: Date()))
     }

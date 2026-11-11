@@ -33,27 +33,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startMonitoring() {
-        let monitor = ClipboardMonitor(source: SystemClipboard()) { [weak self] text in
-            self?.capture(text)
+        let monitor = ClipboardMonitor(source: SystemClipboard()) { [weak self] clip in
+            self?.record(clip)
         }
         monitor.start()
         self.monitor = monitor
     }
 
-    private func capture(_ text: String) {
-        let app = NSWorkspace.shared.frontmostApplication
-        store.add(
-            Clip(
-                text: text,
-                appName: app?.localizedName,
-                appBundleURL: app?.bundleURL,
-                date: Date()
-            )
-        )
+    private func record(_ clip: Clip) {
+        store.add(clip)
         // Length and source app only. Clip text is the user's clipboard and
         // never goes to the unified log, which other processes can read.
         Log.clipboard.info(
-            "captured \(text.count) characters from \(app?.localizedName ?? "an unknown app", privacy: .public); history now \(self.store.count)"
+            "captured \(clip.text.count) characters from \(clip.appName ?? "an unknown app", privacy: .public); history now \(self.store.count)"
         )
     }
 }

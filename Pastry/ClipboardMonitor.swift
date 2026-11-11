@@ -1,6 +1,6 @@
 import Foundation
 
-/// Watches the pasteboard and reports newly copied text.
+/// Watches the pasteboard and reports newly copied text as a `Clip`.
 ///
 /// There is no notification for the system pasteboard, so this polls
 /// `changeCount` on a loop. The loop is a `Task` rather than a `Timer`: main
@@ -15,17 +15,23 @@ final class ClipboardMonitor {
     static let concealedType = "org.nspasteboard.ConcealedType"
 
     private let source: ClipboardSource
+    private let frontmostApp: () -> SourceApp?
+    private let now: () -> Date
     private let interval: Duration
-    private let onCapture: (String) -> Void
+    private let onCapture: (Clip) -> Void
     private var lastChangeCount: Int
     private var pollTask: Task<Void, Never>?
 
     init(
         source: ClipboardSource,
+        frontmostApp: @escaping () -> SourceApp? = { SystemFrontmostApp.current() },
+        now: @escaping () -> Date = Date.init,
         interval: Duration = .milliseconds(500),
-        onCapture: @escaping (String) -> Void
+        onCapture: @escaping (Clip) -> Void
     ) {
         self.source = source
+        self.frontmostApp = frontmostApp
+        self.now = now
         self.interval = interval
         self.onCapture = onCapture
         self.lastChangeCount = source.changeCount
@@ -33,10 +39,12 @@ final class ClipboardMonitor {
 
     func start() {
         guard pollTask == nil else { return }
+        let interval = interval
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let interval = self?.interval else { return }
-                try? await Task.sleep(for: interval)
+                // Tolerance lets the kernel coalesce these wakeups with others;
+                // this process is otherwise idle all day.
+                try? await Task.sleep(for: interval, tolerance: .milliseconds(100))
                 // Dropped without stop() being called: end the loop rather
                 // than poll a monitor nobody owns any more.
                 guard let self else { return }
@@ -50,10 +58,13 @@ final class ClipboardMonitor {
         pollTask = nil
     }
 
-    /// Treats whatever is on the pasteboard right now as already seen. Called
-    /// straight after Pastry writes a clip, so pasting does not re-record it.
-    func ignoreCurrentContents() {
-        lastChangeCount = source.changeCount
+    /// Puts text on the pasteboard without recording it again.
+    ///
+    /// One call rather than "write, then remember to suppress": the change
+    /// count comes back from the write itself, so a copy the user makes in
+    /// between cannot be swallowed, and no caller can forget the second step.
+    func write(_ text: String) {
+        lastChangeCount = source.write(text)
     }
 
     func poll() {
@@ -61,9 +72,9 @@ final class ClipboardMonitor {
         guard changeCount != lastChangeCount else { return }
         lastChangeCount = changeCount
 
-        guard !source.types.contains(Self.concealedType) else { return }
+        guard !source.hasType(Self.concealedType) else { return }
         guard let text = source.string(), !text.isEmpty else { return }
 
-        onCapture(text)
+        onCapture(Clip(text: text, source: frontmostApp(), date: now()))
     }
 }

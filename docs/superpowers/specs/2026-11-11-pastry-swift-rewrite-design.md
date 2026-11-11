@@ -159,8 +159,11 @@ mechanism available.
 
 ### 5.4 `Paster`
 
-1. Writes the clip's text to the general pasteboard and records the resulting
-   change count so the monitor ignores it.
+1. Writes the clip's text to the pasteboard through `ClipboardMonitor.write(_:)`,
+   which is a single operation: the write returns the change count it produced
+   and the monitor records it, so the clip cannot be captured back. This is
+   deliberately **not** "write, then suppress" as two calls — that contract can
+   be forgotten, and a copy the user makes between the two steps is swallowed.
 2. Dismisses whatever UI is showing and yields focus back to the previously
    frontmost app.
 3. After a short delay, synthesizes ⌘V with `CGEventPost`, using the **key code**
@@ -410,6 +413,12 @@ replacement is built.
 - **Paste timing.** The delays between hiding the UI, focus returning and
   posting ⌘V are empirical. Flycut uses 0.2 s; keep that unless testing shows
   otherwise.
+- **History memory is capped by count, not by size.** Forty clips of
+  multi-megabyte pasted text is a few hundred megabytes resident for the life
+  of an all-day agent, and nothing evicts it. Matches Flycut, so it is the
+  status quo rather than a regression, and no byte budget is implemented. Worth
+  revisiting if it bites; a size cap would change observable behaviour and so
+  is the user's call, not a silent default.
 
 ## 14. Non-goals
 
