@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Resources/Pastry.icon from the geometry in concepts.py.
+"""Build Pastry/Pastry.icon from the geometry in concepts.py.
 
 The chosen design is the "angled" composition on the rose ground with charcoal
 scissors. Everything here is derived, so re-running this after editing
@@ -7,7 +7,7 @@ concepts.py regenerates the bundle exactly.
 
 Layout written:
 
-    Resources/Pastry.icon/
+    Pastry/Pastry.icon/
       icon.json          manifest: ground fill, groups, layers, all colour
       Assets/*.svg       one full-canvas 1024x1024 white silhouette per layer
 
@@ -27,7 +27,11 @@ CONCEPT = "angled"
 GROUND = "rose"
 
 HERE = pathlib.Path(__file__).resolve().parent
-BUNDLE = HERE.parent / "Pastry.icon"
+REPO = HERE.parent.parent
+# Inside the app's source folder, which the Xcode project synchronises, so
+# actool compiles the bundle into the app. Outside it the icon builds fine
+# and ships in nothing.
+BUNDLE = REPO / "Pastry" / "Pastry.icon"
 
 
 def srgb(hex_colour, alpha=1.0):
@@ -161,7 +165,7 @@ def build():
         json.dumps(manifest, indent=2, sort_keys=True, separators=(",", " : ")),
         encoding="utf-8")
 
-    rel = os.path.relpath(BUNDLE, HERE.parent.parent)
+    rel = os.path.relpath(BUNDLE, REPO)
     print(f"wrote {rel}/icon.json and {len(written)} layers in {rel}/Assets/")
     for group in groups:
         print(f"  {group['name']}: " + ", ".join(l["name"] for l in group["layers"]))

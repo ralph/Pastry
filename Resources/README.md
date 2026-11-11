@@ -5,12 +5,13 @@ artwork** (`jumpcut.icns`, the `net.sf.jumpcut.*` and `com.generalarcade.*`
 PNGs and TIFFs, the preferences toolbar images) which the Pastry rewrite
 deletes along with the rest of the Objective-C tree.
 
-Two things here are **new and must survive that deletion**:
+The app icon bundle itself has moved out of here to `Pastry/Pastry.icon`,
+where the Xcode project can see it. One thing left here is **new and must
+survive that deletion**:
 
 | Path | What it is |
 |---|---|
-| `Pastry.icon/` | The app bundle icon, as an Icon Composer document: `icon.json` plus one full-canvas 1024×1024 SVG per layer. |
-| `icon/` | The vector sources, the script that builds the bundle, and the script that renders it for review. |
+| `icon/` | The vector sources, the script that builds `Pastry/Pastry.icon`, and the script that renders it for review. |
 
 ## How the icon was produced
 
@@ -21,7 +22,7 @@ the light/dark appearance variants.
 
 ```sh
 cd Resources/icon
-python3 build_icon.py       # regenerates Resources/Pastry.icon
+python3 build_icon.py       # regenerates Pastry/Pastry.icon
 python3 preview_icon.py     # renders the bundle to icon/pastry-icon.png
 ```
 
@@ -32,8 +33,9 @@ Full detail — the design, the colour convention, the layer grouping, what has
 been verified mechanically and what still needs a human in Icon Composer — is
 in [`icon/README.md`](icon/README.md).
 
-The icon is not yet referenced by the Xcode project; wiring it into the target
-is feature 10 of the rewrite plan.
+The icon ships: the bundle lives at `Pastry/Pastry.icon`, inside the folder
+the Xcode project synchronises, and `ASSETCATALOG_COMPILER_APPICON_NAME`
+names it as the app icon.
 
 Note that the menu-bar status item glyph is a **separate** asset — a flat
 monochrome SF Symbol template, because macOS requires menu bar items to be

@@ -3,11 +3,11 @@
 Sources for the Pastry app bundle icon. This is **not** the menu-bar glyph
 (that is a flat monochrome SF Symbol template, a separate asset).
 
-The built bundle lives next to this folder at **`Resources/Pastry.icon`**.
+The built bundle lives at **`Pastry/Pastry.icon`**, inside the folder the
+Xcode project synchronises, which is what gets it compiled into the app.
 
-Status: **design chosen, built, and confirmed in Icon Composer.** Angled
-composition, rose ground, charcoal scissors. Not yet wired into the Xcode
-target — that is feature 10.
+Status: **design chosen, built, confirmed in Icon Composer, and shipping.**
+Angled composition, rose ground, charcoal scissors.
 
 ## The design
 
@@ -35,7 +35,7 @@ still be renamed without touching the artwork.
 | File | What it is |
 |---|---|
 | `concepts.py` | The geometry. Every composition's layers as SVG path data. Single source of truth for the shapes; importable (`concepts.by_id("angled")`) or run it to dump JSON. |
-| `build_icon.py` | Builds `Resources/Pastry.icon` from that geometry. Owns the grouping, the colours and the appearance variants. |
+| `build_icon.py` | Builds `Pastry/Pastry.icon` from that geometry. Owns the grouping, the colours and the appearance variants. |
 | `preview_icon.py` | Renders the **built bundle** to a PNG contact sheet. Reads `icon.json` and the layer SVGs, so it also checks that the manifest and the artwork agree. |
 | `contact_sheet.py` | Renders all the *candidate* compositions side by side — the decision aid, kept for when the design is revisited. |
 | `concepts.png` | The candidate contact sheet, checked in so it is reviewable without running anything. |
@@ -45,7 +45,7 @@ still be renamed without touching the artwork.
 
 ```sh
 cd Resources/icon
-python3 build_icon.py       # regenerates Resources/Pastry.icon
+python3 build_icon.py       # regenerates Pastry/Pastry.icon
 python3 preview_icon.py     # re-renders pastry-icon.png from the bundle
 ```
 
@@ -86,7 +86,7 @@ separate layers in the bundle.
 ## The bundle
 
 ```
-Resources/Pastry.icon/
+Pastry/Pastry.icon/
   icon.json          ground fill, groups, layers, and all colour
   Assets/*.svg       one full-canvas 1024x1024 white silhouette per layer
 ```
@@ -162,7 +162,7 @@ bundles on this machine (Xcode 27.2):
 - The bundle composites correctly **from its own files** — `preview_icon.py`
   reads the manifest and the SVGs, not the generator.
 - macOS identifies it as `com.apple.iconcomposer.icon`
-  (`mdls -name kMDItemContentType Resources/Pastry.icon`), the same content
+  (`mdls -name kMDItemContentType Pastry/Pastry.icon`), the same content
   type as a GUI-authored bundle.
 - **It opens in Icon Composer and renders correctly** — all four groups and
   ten layers appear with the right names and nesting, every fill applies, and
@@ -197,7 +197,11 @@ to build or ship the app; Xcode compiles the bundle as it is.
 
 ## Note on location
 
-`Resources/` currently holds the legacy Objective-C Flycut assets, which a
-later step of the rewrite deletes wholesale. **`Resources/Pastry.icon` and
-`Resources/icon/` must survive that deletion** — or move together to
-`Pastry/Resources/` when the icon is wired into the target in feature 10.
+The bundle itself is now at `Pastry/Pastry.icon`, out of harm's way: it has to
+live inside the synchronised `Pastry/` folder for actool to compile it, and
+`ASSETCATALOG_COMPILER_APPICON_NAME = Pastry` names it as the app icon.
+
+**This folder — the generator and its sources — is still under `Resources/`,
+which feature 10 deletes wholesale along with the rest of the Objective-C
+tree. It must move, not be deleted**, or the icon becomes a binary blob nobody
+can regenerate.

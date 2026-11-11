@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render Resources/Pastry.icon to a PNG contact sheet.
+"""Render Pastry/Pastry.icon to a PNG contact sheet.
 
 This reads the BUNDLE -- icon.json and the layer SVGs -- not the generator, so
 it doubles as a check that the manifest and the artwork actually agree: layer
@@ -21,7 +21,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 HERE = pathlib.Path(__file__).resolve().parent
-BUNDLE = HERE.parent / "Pastry.icon"
+BUNDLE = HERE.parent.parent / "Pastry" / "Pastry.icon"
 SVG_NS = "{http://www.w3.org/2000/svg}"
 SIZES = [320, 128, 64, 32, 16]
 
