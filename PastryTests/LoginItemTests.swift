@@ -2,6 +2,16 @@ import Foundation
 import Testing
 @testable import Pastry
 
+/// A login item that refuses to turn on, as macOS does when the user has
+/// blocked it.
+@MainActor
+private final class RefusingLoginItem: LoginItem {
+    var isEnabled = false
+    var needsApproval = false
+    func setEnabled(_ enabled: Bool) {}
+    func openSystemSettings() {}
+}
+
 @Suite("Launch at login")
 @MainActor
 struct LoginItemTests {
@@ -44,17 +54,43 @@ struct LoginItemTests {
         #expect(item.changes == [true])
     }
 
-    /// Cached, it would disagree with the system the moment the user changed
-    /// it in System Settings.
-    @Test("reports what the system says, not what it was last told")
-    func readsTheSystemState() {
+    /// The value is a mirror of the system's, not a record of what Pastry
+    /// last asked for — the user can change it in System Settings while
+    /// Pastry is not looking, and showing the window refreshes it.
+    @Test("picks up a change made outside Pastry when refreshed")
+    func refreshesFromTheSystem() {
         let item = FakeLoginItem()
         let preferences = Preferences(defaults: makeTestDefaults(), loginItem: item)
+        #expect(!preferences.launchAtLogin)
 
         item.isEnabled = true
+        preferences.refreshLoginItemState()
         #expect(preferences.launchAtLogin)
+
         item.isEnabled = false
+        preferences.refreshLoginItemState()
         #expect(!preferences.launchAtLogin)
+    }
+
+    /// A toggle that stayed on after the request was refused would claim
+    /// something that is not true.
+    @Test("falls back to the system's answer when the request is refused")
+    func followsARefusedRequest() {
+        let item = RefusingLoginItem()
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: item)
+
+        preferences.launchAtLogin = true
+        #expect(!preferences.launchAtLogin)
+    }
+
+    /// Setting it to what it already is must not go near the system: each
+    /// call is a synchronous round trip of about a millisecond.
+    @Test("asks the system nothing when the value is unchanged")
+    func silentWhenUnchanged() {
+        let item = FakeLoginItem()
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: item)
+        preferences.launchAtLogin = false
+        #expect(item.changes.isEmpty)
     }
 
     /// macOS answers `register()` with "waiting for approval" rather than an
@@ -65,6 +101,19 @@ struct LoginItemTests {
         let item = FakeLoginItem()
         item.needsApproval = true
         let preferences = Preferences(defaults: makeTestDefaults(), loginItem: item)
+        #expect(preferences.loginItemNeedsApproval)
+    }
+
+    /// The row that says so appears on first run, after register() has been
+    /// called — so it has to come from the refresh, not only from init.
+    @Test("surfaces approval that only became necessary after registering")
+    func surfacesApprovalAfterRegistering() {
+        let item = FakeLoginItem()
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: item)
+        #expect(!preferences.loginItemNeedsApproval)
+
+        item.needsApproval = true
+        preferences.applyDefaultLoginItemOnce()
         #expect(preferences.loginItemNeedsApproval)
     }
 

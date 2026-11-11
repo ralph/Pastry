@@ -28,10 +28,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard !AppEnvironment.isRunningTests else { return }
-        installPreferences()
+        let preferences = installPreferences()
         restoreHistory()
         startMonitoring()
-        installStatusItem()
+        installStatusItem(displayCount: preferences.displayCount)
         installBezel()
     }
 
@@ -39,30 +39,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ///
     /// First, because the history is trimmed to the remember count as it is
     /// restored and the menu is built with the display count.
-    private func installPreferences() {
+    @discardableResult
+    private func installPreferences() -> Preferences {
         let preferences = Preferences(loginItem: SystemLoginItem())
         preferences.applyDefaultLoginItemOnce()
         store.rememberCount = preferences.rememberCount
 
-        preferences.onChange = { [weak self] in
-            guard let self, let preferences = self.preferences else { return }
-            // Lowering Remember discards the oldest clippings at once, which
-            // ClipStore does on set and announces as a deletion — so the
-            // debounced saver flushes it rather than leaving clips on disk
-            // that the app no longer has.
-            store.rememberCount = preferences.rememberCount
-            statusMenu?.displayCount = preferences.displayCount
-        }
+        // Reads self.preferences back rather than capturing the local: the
+        // closure is owned by the object it would capture, so holding it
+        // strongly here would be a cycle.
+        preferences.onChange = { [weak self] in self?.applyPreferences() }
 
         self.preferences = preferences
         preferencesWindow = PreferencesWindowController(preferences: preferences)
+        return preferences
+    }
+
+    /// Pushes the settings into the parts of the app that hold copies.
+    ///
+    /// Pushed rather than pulled so neither the store nor the menu has to
+    /// know that Preferences exists. Lowering Remember discards the oldest
+    /// clippings, which ClipStore announces as a deletion, so the saver
+    /// writes it out at once instead of leaving clips on disk that the app
+    /// no longer has.
+    private func applyPreferences() {
+        guard let preferences else { return }
+        store.rememberCount = preferences.rememberCount
+        statusMenu?.displayCount = preferences.displayCount
     }
 
     private func showPreferences() {
         preferencesWindow?.show()
     }
 
-    private func installStatusItem() {
+    private func installStatusItem(displayCount: Int) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let image = MenuBarIcon.image() {
             item.button?.image = image
@@ -72,10 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // no way left to quit it, so fall back to something visible.
             item.button?.title = "Pastry"
         }
-        let statusMenu = StatusMenu(
-            store: store,
-            displayCount: preferences?.displayCount ?? 30
-        ) { [weak self] clip in
+        let statusMenu = StatusMenu(store: store, displayCount: displayCount) { [weak self] clip in
             self?.choose(clip)
         }
         statusMenu.onWillOpen = { [weak self] in self?.menuWillOpen() }

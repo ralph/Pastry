@@ -14,6 +14,8 @@ final class PreferencesWindowController {
     private(set) var window: NSWindow?
     private let preferences: Preferences
 
+    private static let frameName = NSWindow.FrameAutosaveName("PastrySettings")
+
     init(preferences: Preferences) {
         self.preferences = preferences
     }
@@ -29,13 +31,17 @@ final class PreferencesWindowController {
         // NSApp.isActive, which is never true for this app — the lesson from
         // features 3, 5 and 7.
         NSApp.activate(ignoringOtherApps: true)
-        if !window.isVisible { window.center() }
+        // The system's launch-at-login state can have been changed in System
+        // Settings since this window was last up.
+        preferences.refreshLoginItemState()
         window.makeKeyAndOrderFront(nil)
     }
 
     private func makeWindow() -> NSWindow {
+        // Zero, because the size comes from the view a moment later. The
+        // view is the only place the window's dimensions are written down.
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 320),
+            contentRect: .zero,
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -44,9 +50,14 @@ final class PreferencesWindowController {
         window.contentViewController = NSHostingController(
             rootView: PreferencesView(preferences: preferences)
         )
-        // Sized to whatever SwiftUI asks for rather than the rect above,
-        // which exists only so the window has somewhere to start.
-        window.setContentSize(window.contentViewController?.view.fittingSize ?? window.frame.size)
+        window.setContentSize(window.contentViewController?.view.fittingSize ?? .zero)
+        // Where the user put it last, falling back to the middle of the
+        // screen. Centring on every reopen would move a window the user had
+        // deliberately placed, because a closed window is not a visible one.
+        if !window.setFrameUsingName(Self.frameName) {
+            window.center()
+        }
+        window.setFrameAutosaveName(Self.frameName)
         // Closing must not destroy it: it is reopened from the menu and from
         // ⌘,, and show() hands back the same window each time.
         window.isReleasedWhenClosed = false

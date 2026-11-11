@@ -5,68 +5,90 @@ import Observation
 ///
 /// The counts live in `UserDefaults`. Launch at login does not: the system
 /// owns that state, and the user can change it from System Settings without
-/// Pastry running.
+/// Pastry running — so what is kept here is a mirror, refreshed when there is
+/// a reason to think it has moved.
 @MainActor
 @Observable
 final class Preferences {
     /// Below one, a clipboard manager remembers nothing, which is a way to
     /// lose work rather than a setting. Ninety-nine is Flycut's ceiling.
     static let countRange = 1...99
+    static let defaultRememberCount = 40
+    static let defaultDisplayCount = 30
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let loginItem: LoginItem
 
     /// Called when a stored value actually changed, so the app can apply it.
+    ///
+    /// Alongside `@Observable` rather than instead of it: SwiftUI learns
+    /// through observation, but the AppKit consumers — the store, the menu,
+    /// and feature 9's hotkey registration — are not in an update graph and
+    /// have to be told.
     @ObservationIgnored var onChange: (() -> Void)?
 
+    // Observation instruments stored properties only, so the public values
+    // below are computed over these. Their names must not begin with an
+    // underscore: that is where the macro puts its own backing storage.
+    private var storedRememberCount: Int
+    private var storedDisplayCount: Int
+    private var storedLaunchAtLogin: Bool
+
     var rememberCount: Int {
-        didSet {
-            let clamped = Self.clamp(rememberCount)
-            // Re-enters this observer with the in-range value, which then
-            // falls through to the persist below. Only reachable from a
-            // defaults write or a programmatic set — the stepper cannot
-            // leave the range.
-            guard clamped == rememberCount else {
-                rememberCount = clamped
-                return
-            }
-            guard rememberCount != oldValue else { return }
-            defaults.set(rememberCount, forKey: Key.rememberCount)
-            onChange?()
-        }
+        get { storedRememberCount }
+        set { assign(&storedRememberCount, to: newValue, key: Key.rememberCount) }
     }
 
     var displayCount: Int {
-        didSet {
-            let clamped = Self.clamp(displayCount)
-            guard clamped == displayCount else {
-                displayCount = clamped
-                return
-            }
-            guard displayCount != oldValue else { return }
-            defaults.set(displayCount, forKey: Key.displayCount)
-            onChange?()
+        get { storedDisplayCount }
+        set { assign(&storedDisplayCount, to: newValue, key: Key.displayCount) }
+    }
+
+    /// Whether Pastry starts at login.
+    ///
+    /// Reading this gives the mirror, not the system. Asking the system is a
+    /// synchronous round trip to `smd` of about a millisecond, which SwiftUI
+    /// would pay several times per redraw — and a computed property over the
+    /// service would register no observation dependency at all, so the toggle
+    /// would never redraw when its own value changed.
+    var launchAtLogin: Bool {
+        get { storedLaunchAtLogin }
+        set {
+            guard newValue != storedLaunchAtLogin else { return }
+            loginItem.setEnabled(newValue)
+            // Read back rather than assumed: the request can be refused, or
+            // answered with "waiting for approval", and the toggle has to
+            // show what actually happened.
+            refreshLoginItemState()
         }
     }
 
-    var launchAtLogin: Bool {
-        get { loginItem.isEnabled }
-        set { loginItem.setEnabled(newValue) }
-    }
-
-    var loginItemNeedsApproval: Bool { loginItem.needsApproval }
+    /// macOS answers `register()` with this rather than an error, and nothing
+    /// happens at login until the user allows it.
+    private(set) var loginItemNeedsApproval: Bool
 
     init(defaults: UserDefaults = .standard, loginItem: LoginItem) {
         self.defaults = defaults
         self.loginItem = loginItem
         defaults.register(defaults: [
-            Key.rememberCount: 40,
-            Key.displayCount: 30,
+            Key.rememberCount: Self.defaultRememberCount,
+            Key.displayCount: Self.defaultDisplayCount,
         ])
-        // Clamped on the way in as well: these are ordinary defaults keys and
-        // anything at all can have written them.
-        rememberCount = Self.clamp(defaults.integer(forKey: Key.rememberCount))
-        displayCount = Self.clamp(defaults.integer(forKey: Key.displayCount))
+        // Clamped on the way in as well as on the way out: these are ordinary
+        // defaults keys and anything at all can have written them.
+        storedRememberCount = Self.clamp(defaults.integer(forKey: Key.rememberCount))
+        storedDisplayCount = Self.clamp(defaults.integer(forKey: Key.displayCount))
+        storedLaunchAtLogin = loginItem.isEnabled
+        loginItemNeedsApproval = loginItem.needsApproval
+    }
+
+    /// Reads the system's launch-at-login state back into the mirror.
+    ///
+    /// Called when the Settings window is shown, because the user may have
+    /// changed it in System Settings while Pastry was not looking.
+    func refreshLoginItemState() {
+        storedLaunchAtLogin = loginItem.isEnabled
+        loginItemNeedsApproval = loginItem.needsApproval
     }
 
     /// Turns launch at login on the first time Pastry runs, and never again.
@@ -77,9 +99,26 @@ final class Preferences {
         guard !defaults.bool(forKey: Key.appliedDefaultLoginItem) else { return }
         defaults.set(true, forKey: Key.appliedDefaultLoginItem)
         loginItem.setEnabled(true)
+        refreshLoginItemState()
     }
 
     func openLoginItemSettings() { loginItem.openSystemSettings() }
+
+    /// The only way a count changes: clamp, store, persist, announce.
+    ///
+    /// Clamping here rather than at the call site because the call sites that
+    /// can produce an out-of-range value are `defaults write` from a shell and
+    /// a later caller — the stepper is already bound to the range.
+    private func assign(_ stored: inout Int, to newValue: Int, key: String) {
+        let clamped = Self.clamp(newValue)
+        // Compared after clamping, so a write of 1000 to a count already at
+        // the ceiling announces nothing. Otherwise holding a stepper at its
+        // limit would re-trim the history and schedule a disk write per tick.
+        guard clamped != stored else { return }
+        stored = clamped
+        defaults.set(clamped, forKey: key)
+        onChange?()
+    }
 
     private static func clamp(_ value: Int) -> Int {
         min(max(value, countRange.lowerBound), countRange.upperBound)

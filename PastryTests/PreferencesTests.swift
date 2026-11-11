@@ -2,32 +2,6 @@ import Foundation
 import Testing
 @testable import Pastry
 
-/// A login item that only records what it was told.
-///
-/// No test may reach `SMAppService`: registering a real login item writes to
-/// the user's own System Settings and outlives the test run.
-@MainActor
-final class FakeLoginItem: LoginItem {
-    var isEnabled = false
-    var needsApproval = false
-    private(set) var changes: [Bool] = []
-    private(set) var openedSystemSettings = false
-
-    func setEnabled(_ enabled: Bool) {
-        changes.append(enabled)
-        isEnabled = enabled
-    }
-
-    func openSystemSettings() { openedSystemSettings = true }
-}
-
-/// A defaults suite of its own per call, so nothing reaches the real defaults
-/// and one test cannot see another's writes.
-@MainActor
-func makeTestDefaults() -> UserDefaults {
-    UserDefaults(suiteName: "de.rvdh.Pastry.tests.\(UUID().uuidString)")!
-}
-
 @Suite("Preferences")
 @MainActor
 struct PreferencesTests {
@@ -92,12 +66,14 @@ struct PreferencesTests {
         var changes = 0
         preferences.onChange = { changes += 1 }
 
-        preferences.rememberCount = preferences.rememberCount
-        preferences.displayCount = preferences.displayCount
+        let remember = preferences.rememberCount
+        let display = preferences.displayCount
+        preferences.rememberCount = remember
+        preferences.displayCount = display
         #expect(changes == 0)
     }
 
-    /// The clamp must not swallow the change it clamped: setting 100 from 40
+    /// The clamp must not swallow the change it clamped: setting 1000 from 40
     /// really is a change to 99, and the history has to be trimmed for it.
     @Test("announces a change that arrived out of range")
     func announcesAClampedChange() {
@@ -108,5 +84,21 @@ struct PreferencesTests {
         preferences.rememberCount = 1_000
         #expect(preferences.rememberCount == 99)
         #expect(changes == 1)
+    }
+
+    /// Compared after clamping, not before. Otherwise holding a stepper at
+    /// its limit would re-trim the history and schedule a disk write on
+    /// every tick that moved nothing.
+    @Test("stays silent when an out-of-range value clamps to what it already is")
+    func staysSilentWhenTheClampChangesNothing() {
+        let preferences = Preferences(defaults: makeTestDefaults(), loginItem: FakeLoginItem())
+        preferences.rememberCount = 99
+        var changes = 0
+        preferences.onChange = { changes += 1 }
+
+        preferences.rememberCount = 1_000
+        preferences.rememberCount = 500
+        #expect(preferences.rememberCount == 99)
+        #expect(changes == 0)
     }
 }

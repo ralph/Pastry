@@ -181,22 +181,22 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSSearchFieldDelegate {
         }
     }
 
-    @discardableResult
     @objc private func preferences() {
         onOpenPreferences?()
     }
 
+    // Returns nothing: no caller has ever used the item it makes, and the
+    // @discardableResult that used to say so was one more thing to get wrong.
     private func addItem(
         _ title: String,
         action: Selector?,
         keyEquivalent: String = "",
         target: AnyObject? = nil
-    ) -> NSMenuItem {
+    ) {
         let item = menu.addItem(withTitle: title, action: action, keyEquivalent: keyEquivalent)
         // A nil target sends the action up the responder chain, which is how
         // Quit reaches NSApplication.
         item.target = target
-        return item
     }
 
     private func setQuery(_ text: String) {
