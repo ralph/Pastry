@@ -2,14 +2,13 @@
 """Contact sheet for a cupcake candidate set: every variant, both appearances,
 320 -> 16 pt.
 
-    python3 cupcake_sheet.py              # cupcake3q (the three-quarter set)
-    python3 cupcake_sheet.py cupcake      # the straight-on set
+    python3 cupcake_sheet.py              # cupcake3q, the shipping design
+    python3 cupcake_sheet.py <mod>        # any other candidate module
     python3 cupcake_sheet.py <mod> --svg-only
 
-Any module exposing emit() -> {squircle, bg, concepts} works. Unlike
-contact_sheet.py (which renders the older flat-fill scissors concepts) this one
-understands per-shape gradients, because every shape in the cupcake designs
-carries one.
+Any module exposing emit() -> {squircle, bg, concepts} works, so a new set of
+candidates only needs a new module. Use this for exploring alternatives; use
+preview_icon.py to check what is actually in the bundle.
 """
 import html
 import importlib

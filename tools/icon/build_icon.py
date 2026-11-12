@@ -1,36 +1,45 @@
 #!/usr/bin/env python3
-"""Build Pastry/Pastry.icon from the geometry in concepts.py.
+"""Build Pastry/Pastry.icon from the geometry in cupcake3q.py.
 
-The chosen design is the "angled" composition on the rose ground with charcoal
-scissors. Everything here is derived, so re-running this after editing
-concepts.py regenerates the bundle exactly.
+The chosen design is the three-quarter cupcake: three turns of frosting, slate
+case with pleats, on the soft rosy ground. Everything here is derived, so
+re-running this after editing cupcake3q.py regenerates the bundle exactly.
 
 Layout written:
 
     Pastry/Pastry.icon/
-      icon.json          manifest: ground fill, groups, layers, all colour
-      Assets/*.svg       one full-canvas 1024x1024 white silhouette per layer
+      icon.json          the ground fill and the layer grouping
+      Assets/*.svg       one full-canvas 1024x1024 layer, carrying its own
+                         gradient
 
-Colour convention: the SVGs are pure geometry filled white, and every colour
-lives in icon.json. A layer's `fill` in the manifest overrides the fill in its
-SVG -- verified against a shipped Icon Composer bundle whose bolt.svg is
-`fill="#FFFFFF"` in markup yet renders gold. Keeping colour in one file means a
-palette change never touches the artwork.
+Colour convention: **each layer SVG carries its own gradient and icon.json sets
+no layer fills.** This is the opposite of the previous (flat-colour) icon,
+where all colour lived in the manifest, and the reason is that every shape in
+this design needs a gradient:
+
+  * A manifest `fill` can only be a solid or the top-level ground gradient; a
+    per-layer gradient there is not something any bundle on this machine uses,
+    so it is unverified.
+  * An SVG gradient is verified to be renderable -- CoreSVG, the framework
+    Icon Composer bundles to draw these layers, carries full support for
+    linearGradient, stop-color, gradientUnits and objectBoundingBox.
+  * Nothing in the cupcake changes between appearances, so no layer needs an
+    appearance variant anyway. Only the ground gets a dark specialization.
+
+If a layer ever turns up flat or black in Icon Composer, that is the signal
+this assumption broke; the fallback is to flatten that layer to a solid
+manifest fill, or export it as a PNG.
 """
 import json
 import os
 import pathlib
 
-import concepts
+import cupcake3q as design
 
-CONCEPT = "angled"
-GROUND = "rose"
+CONCEPT = "tq3"
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent.parent
-# Inside the app's source folder, which the Xcode project synchronises, so
-# actool compiles the bundle into the app. Outside it the icon builds fine
-# and ships in nothing.
 BUNDLE = REPO / "Pastry" / "Pastry.icon"
 
 
@@ -41,134 +50,104 @@ def srgb(hex_colour, alpha=1.0):
     return f"srgb:{r:.5f},{g:.5f},{b:.5f},{alpha:.5f}"
 
 
-def gradient(top, bottom):
+def ground(stops):
     # No "orientation": top-to-bottom is the default, and Icon Composer strips
     # an explicit one on save. Omitting it keeps the file byte-identical across
     # a round trip through the GUI.
-    return {"linear-gradient": [srgb(top), srgb(bottom)]}
+    return {"linear-gradient": [srgb(stops[0]), srgb(stops[1])]}
 
 
-SVG = ('<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" '
-       'viewBox="0 0 1024 1024"><path fill="#FFFFFF" d="{d}"/></svg>\n')
+def layer_svg(layer):
+    """One layer as a full-canvas SVG carrying its own gradient."""
+    x1, y1, x2, y2 = layer["dir"]
+    c0, c1 = layer["stops"]
+    opacity = layer.get("opacity", 1.0)
+    fill_opacity = "" if opacity >= 1.0 else f' fill-opacity="{opacity:g}"'
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" '
+        'viewBox="0 0 1024 1024">\n'
+        f'<defs><linearGradient id="g" x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}">'
+        f'<stop offset="0" stop-color="{c0}"/>'
+        f'<stop offset="1" stop-color="{c1}"/></linearGradient></defs>\n'
+        f'<path fill="url(#g)"{fill_opacity} d="{layer["d"]}"/>\n'
+        '</svg>\n')
 
-# Scissors are the only thing that changes between appearances. Charcoal on the
-# light ground; mid-slate in Dark, because black disappears into the dark ground
-# and near-white disappears into the white frosting the blades cross.
-SCISSORS = {"default": "#332E3B", "dark": "#A7AFC4"}
 
 # Groups are listed FRONT to BACK, and so are the layers inside them.
-# Icon Composer allows 1-4 layers per group, which is why the slice is split.
+# Icon Composer allows 1-4 layers per group.
 GROUPS = [
-    {
-        "name": "Scissors",
-        "layers": ["scissors-rings", "scissors-body"],
-        "fill": SCISSORS,
-        "glass": True,
-        "specular": True,
-        "shadow": {"kind": "neutral", "opacity": 0.5},
-        "translucency": {"enabled": False, "value": 0.5},
-    },
-    {
-        "name": "Garnish",
-        "layers": ["cherry", "cherry-stem", "pineapple"],
-        "glass": {"cherry": True, "cherry-stem": False, "pineapple": True},
-        "specular": True,
-        "shadow": {"kind": "neutral", "opacity": 0.5},
-        "translucency": {"enabled": False, "value": 0.5},
-    },
-    {
-        "name": "Topping",
-        "layers": ["fruit-bits", "frosting"],
-        "glass": {"fruit-bits": False, "frosting": True},
-        "specular": True,
-        "shadow": {"kind": "neutral", "opacity": 0.5},
-        "translucency": {"enabled": True, "value": 0.12},
-    },
-    {
-        "name": "Sponge",
-        "layers": ["cream", "sponge-top", "sponge-bottom"],
-        "glass": True,
-        "specular": True,
-        "shadow": {"kind": "neutral", "opacity": 0.5},
-        "translucency": {"enabled": True, "value": 0.12},
-    },
+    {"name": "Cherry", "layers": ["cherry-shine", "cherry", "cherry-stem"],
+     "glass": True, "specular": True,
+     "shadow": {"kind": "neutral", "opacity": 0.5},
+     "translucency": {"enabled": False, "value": 0.5}},
+    {"name": "Frosting", "layers": ["swirl-0", "swirl-1", "swirl-2"],
+     "glass": True, "specular": True,
+     "shadow": {"kind": "neutral", "opacity": 0.5},
+     "translucency": {"enabled": True, "value": 0.1}},
+    {"name": "Case", "layers": ["pleats", "case"],
+     "glass": True, "specular": True,
+     "shadow": {"kind": "neutral", "opacity": 0.5},
+     "translucency": {"enabled": True, "value": 0.1}},
+    {"name": "Cake", "layers": ["cake"],
+     "glass": True, "specular": True,
+     "shadow": {"kind": "neutral", "opacity": 0.5},
+     "translucency": {"enabled": False, "value": 0.5}},
 ]
 
 
 def build():
-    concept = concepts.by_id(CONCEPT)
-    tones = {layer["name"]: layer["light"] for layer in concept["layers"]}
-    paths = {layer["name"]: layer["d"] for layer in concept["layers"]}
+    layers = {l["name"]: l for l in design.by_id(CONCEPT)["layers"]}
 
     assets = BUNDLE / "Assets"
     assets.mkdir(parents=True, exist_ok=True)
     for stale in assets.glob("*.svg"):
         stale.unlink()
+    for stale in assets.glob("*.png"):
+        stale.unlink()
 
-    written = []
-    for name, d in paths.items():
-        (assets / f"{name}.svg").write_text(SVG.format(d=d), encoding="utf-8")
-        written.append(f"{name}.svg")
+    for name, layer in layers.items():
+        (assets / f"{name}.svg").write_text(layer_svg(layer), encoding="utf-8")
 
-    groups = []
-    for spec in GROUPS:
-        layers = []
-        for name in spec["layers"]:
-            if name not in paths:
-                raise KeyError(f"group {spec['name']} wants missing layer {name}")
-            glass = spec["glass"]
-            layer = {
-                "image-name": f"{name}.svg",
-                "name": name,
-                "glass": glass[name] if isinstance(glass, dict) else glass,
-            }
-            fill = spec.get("fill")
-            if isinstance(fill, dict):
-                layer["fill-specializations"] = [
-                    {"value": {"solid": srgb(fill["default"])}},
-                    {"appearance": "dark", "value": {"solid": srgb(fill["dark"])}},
-                ]
-            else:
-                layer["fill"] = {"solid": srgb(tones[name])}
-            layers.append(layer)
-        groups.append({
-            "name": spec["name"],
-            "layers": layers,
-            "specular": spec["specular"],
-            "shadow": spec["shadow"],
-            "translucency": spec["translucency"],
-        })
-
-    covered = [n for spec in GROUPS for n in spec["layers"]]
-    missing = [n for n in paths if n not in covered]
+    covered = [n for g in GROUPS for n in g["layers"]]
+    missing = [n for n in layers if n not in covered]
+    unknown = [n for n in covered if n not in layers]
     if missing:
         raise SystemExit(f"layers not placed in any group: {missing}")
+    if unknown:
+        raise SystemExit(f"groups reference missing layers: {unknown}")
+    too_big = [g["name"] for g in GROUPS if len(g["layers"]) > 4]
+    if too_big:
+        raise SystemExit(f"groups over the four-layer limit: {too_big}")
 
-    light, dark, _ = concepts.COLORWAYS[GROUND]
+    groups = [{
+        "name": g["name"],
+        "layers": [{"image-name": f"{n}.svg", "name": n, "glass": g["glass"]}
+                   for n in g["layers"]],
+        "specular": g["specular"],
+        "shadow": g["shadow"],
+        "translucency": g["translucency"],
+    } for g in GROUPS]
+
     manifest = {
         "fill-specializations": [
-            {"value": gradient(*light)},
-            {"appearance": "dark", "value": gradient(*dark)},
+            {"value": ground(design.BG["light"])},
+            {"appearance": "dark", "value": ground(design.BG["dark"])},
         ],
         "groups": groups,
         "supported-platforms": {"circles": ["watchOS"], "squares": "shared"},
     }
-    # Icon Composer's own formatting: two-space indent, keys sorted, and a
-    # space either side of the colon. Matching it means re-saving from the GUI
-    # produces no diff, so hand edits there and regeneration here stay legible
-    # against each other.
-    # No trailing newline, because Icon Composer does not write one. Matching
-    # the GUI byte-for-byte matters more here than the usual POSIX habit: the
-    # GUI is what gets opened to tune glass and translucency, so it is the tool
-    # that will rewrite this file most often.
+
+    # Icon Composer's own formatting: two-space indent, keys sorted, a space
+    # either side of the colon, and no trailing newline. Matching it means
+    # re-saving from the GUI produces no diff.
     (BUNDLE / "icon.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True, separators=(",", " : ")),
         encoding="utf-8")
 
     rel = os.path.relpath(BUNDLE, REPO)
-    print(f"wrote {rel}/icon.json and {len(written)} layers in {rel}/Assets/")
-    for group in groups:
-        print(f"  {group['name']}: " + ", ".join(l["name"] for l in group["layers"]))
+    print(f"wrote {rel}/icon.json and {len(layers)} layers in {rel}/Assets/")
+    for g in groups:
+        print(f"  {g['name']}: " + ", ".join(l["name"] for l in g["layers"]))
 
 
 if __name__ == "__main__":

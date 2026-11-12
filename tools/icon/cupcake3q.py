@@ -67,7 +67,7 @@ def pleats(rim_y, rim_rx, rim_ry, base_y, base_rx, base_ry, n=12, step=3):
     return " ".join(out)
 
 
-def swirl_turns(n, y0=542, y1=346, rx0=206, rx1=112, ry0=76, ry1=48, wobble=13):
+def swirl_turns(n, y0=520, y1=398, rx0=284, rx1=150, ry0=86, ry1=60, wobble=14):
     """n turns of piped frosting, interpolated between a fixed bottom and top
     ellipse. Keeping the ends fixed means the swirl's height and taper stay put
     however many turns there are -- only the banding gets coarser or finer.
@@ -119,19 +119,19 @@ def L(name, d, tone, opacity=1.0):
 
 
 # Shared case geometry for the three-quarter variants.
-RIM_Y, RIM_RX, RIM_RY = 630, 232, 58
-BASE_Y, BASE_RX, BASE_RY = 822, 158, 38
+RIM_Y, RIM_RX, RIM_RY = 586, 316, 76
+BASE_Y, BASE_RX, BASE_RY = 806, 212, 44
 
 CASE_D = case(RIM_Y, RIM_RX, RIM_RY, BASE_Y, BASE_RX, BASE_RY)
 PLEAT_D = pleats(RIM_Y, RIM_RX, RIM_RY, BASE_Y, BASE_RX, BASE_RY)
-CAKE_D = ellipse(MID, 656, 248, 104)
+CAKE_D = ellipse(MID, 620, 340, 128)
 
 SWIRL = [(MID, 540, 206, 72), (500, 470, 176, 64),
          (524, 408, 146, 56), (506, 352, 112, 46), (MID, 306, 72, 36)]
 
-CHERRY = circle(MID, 256, 52)
-STEM = ("M 504 212 Q 520 158 566 136 L 578 156 Q 540 176 524 216 Z")
-SHINE = ellipse(490, 238, 16, 10)
+CHERRY = circle(MID, 298, 66)
+STEM = ("M 500 256 Q 522 192 578 166 L 592 190 Q 544 212 524 262 Z")
+SHINE = ellipse(484, 276, 20, 13)
 
 
 def cherry_layers():
@@ -172,6 +172,13 @@ def squircle(size=C, n=5.0, steps=76):
         r = a / (abs(ct) ** n + abs(st) ** n) ** (1 / n) if (ct or st) else a
         pts.append((a + r * ct, a + r * st))
     return "M " + " L ".join(P(*p) for p in pts) + " Z"
+
+
+def by_id(cid):
+    for c in CONCEPTS:
+        if c["id"] == cid:
+            return c
+    raise KeyError(cid)
 
 
 def emit():

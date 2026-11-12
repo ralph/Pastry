@@ -3,8 +3,8 @@
     {
       "value" : {
         "linear-gradient" : [
-          "srgb:1.00000,0.94118,0.92157,1.00000",
-          "srgb:1.00000,0.77647,0.80784,1.00000"
+          "srgb:1.00000,0.95294,0.93725,1.00000",
+          "srgb:1.00000,0.78431,0.82353,1.00000"
         ]
       }
     },
@@ -12,8 +12,8 @@
       "appearance" : "dark",
       "value" : {
         "linear-gradient" : [
-          "srgb:0.36078,0.18824,0.22353,1.00000",
-          "srgb:0.16471,0.07843,0.09804,1.00000"
+          "srgb:0.36863,0.19608,0.23137,1.00000",
+          "srgb:0.16863,0.08235,0.10196,1.00000"
         ]
       }
     }
@@ -22,81 +22,22 @@
     {
       "layers" : [
         {
-          "fill-specializations" : [
-            {
-              "value" : {
-                "solid" : "srgb:0.20000,0.18039,0.23137,1.00000"
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "srgb:0.65490,0.68627,0.76863,1.00000"
-              }
-            }
-          ],
           "glass" : true,
-          "image-name" : "scissors-rings.svg",
-          "name" : "scissors-rings"
+          "image-name" : "cherry-shine.svg",
+          "name" : "cherry-shine"
         },
         {
-          "fill-specializations" : [
-            {
-              "value" : {
-                "solid" : "srgb:0.20000,0.18039,0.23137,1.00000"
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "solid" : "srgb:0.65490,0.68627,0.76863,1.00000"
-              }
-            }
-          ],
-          "glass" : true,
-          "image-name" : "scissors-body.svg",
-          "name" : "scissors-body"
-        }
-      ],
-      "name" : "Scissors",
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "specular" : true,
-      "translucency" : {
-        "enabled" : false,
-        "value" : 0.5
-      }
-    },
-    {
-      "layers" : [
-        {
-          "fill" : {
-            "solid" : "srgb:0.90980,0.21961,0.29804,1.00000"
-          },
           "glass" : true,
           "image-name" : "cherry.svg",
           "name" : "cherry"
         },
         {
-          "fill" : {
-            "solid" : "srgb:0.30588,0.49804,0.23529,1.00000"
-          },
-          "glass" : false,
+          "glass" : true,
           "image-name" : "cherry-stem.svg",
           "name" : "cherry-stem"
-        },
-        {
-          "fill" : {
-            "solid" : "srgb:1.00000,0.76863,0.16863,1.00000"
-          },
-          "glass" : true,
-          "image-name" : "pineapple.svg",
-          "name" : "pineapple"
         }
       ],
-      "name" : "Garnish",
+      "name" : "Cherry",
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.5
@@ -110,23 +51,22 @@
     {
       "layers" : [
         {
-          "fill" : {
-            "solid" : "srgb:1.00000,0.76863,0.16863,1.00000"
-          },
-          "glass" : false,
-          "image-name" : "fruit-bits.svg",
-          "name" : "fruit-bits"
+          "glass" : true,
+          "image-name" : "swirl-0.svg",
+          "name" : "swirl-0"
         },
         {
-          "fill" : {
-            "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
-          },
           "glass" : true,
-          "image-name" : "frosting.svg",
-          "name" : "frosting"
+          "image-name" : "swirl-1.svg",
+          "name" : "swirl-1"
+        },
+        {
+          "glass" : true,
+          "image-name" : "swirl-2.svg",
+          "name" : "swirl-2"
         }
       ],
-      "name" : "Topping",
+      "name" : "Frosting",
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.5
@@ -134,37 +74,23 @@
       "specular" : true,
       "translucency" : {
         "enabled" : true,
-        "value" : 0.12
+        "value" : 0.1
       }
     },
     {
       "layers" : [
         {
-          "fill" : {
-            "solid" : "srgb:1.00000,0.96471,0.90196,1.00000"
-          },
           "glass" : true,
-          "image-name" : "cream.svg",
-          "name" : "cream"
+          "image-name" : "pleats.svg",
+          "name" : "pleats"
         },
         {
-          "fill" : {
-            "solid" : "srgb:0.97647,0.84706,0.60784,1.00000"
-          },
           "glass" : true,
-          "image-name" : "sponge-top.svg",
-          "name" : "sponge-top"
-        },
-        {
-          "fill" : {
-            "solid" : "srgb:0.97647,0.84706,0.60784,1.00000"
-          },
-          "glass" : true,
-          "image-name" : "sponge-bottom.svg",
-          "name" : "sponge-bottom"
+          "image-name" : "case.svg",
+          "name" : "case"
         }
       ],
-      "name" : "Sponge",
+      "name" : "Case",
       "shadow" : {
         "kind" : "neutral",
         "opacity" : 0.5
@@ -172,7 +98,26 @@
       "specular" : true,
       "translucency" : {
         "enabled" : true,
-        "value" : 0.12
+        "value" : 0.1
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "cake.svg",
+          "name" : "cake"
+        }
+      ],
+      "name" : "Cake",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
       }
     }
   ],
