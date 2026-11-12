@@ -1,4 +1,12 @@
-# What stands between Pastry and the App Store
+# What stood between Pastry and the App Store
+
+> **Submitted.** 0.1.1, build `12.1`, review submission
+> `ffeaf8c8-db9e-419d-8dc5-e170654ed04c`, 2026-11-12. The version is
+> `WAITING_FOR_REVIEW`, and the release type is `AFTER_APPROVAL`, so an
+> approval puts it on the store with nothing further to press.
+>
+> The rest of this document is kept as the record of how it got there, in the
+> present tense it was written in.
 
 The metadata is ready. The binary is not, but much less stands in the way than
 it looked. This is what was verified, and what is left.

@@ -10,7 +10,8 @@ submission.
 | --- | --- |
 | App ID | `6833662343` |
 | Bundle ID record | `TVTSP57476` (`de.rvdh.Pastry`, team `89S4HZY343`) |
-| State | `PREPARE_FOR_SUBMISSION` |
+| State | `WAITING_FOR_REVIEW` since 2026-11-12 |
+| Review submission | `ffeaf8c8-db9e-419d-8dc5-e170654ed04c` |
 
 ---
 
@@ -225,6 +226,32 @@ because it will have to be repeated for 0.2.0:
   `-alpha remove -alpha off` before uploading.
 
 The two site images in `site/assets/` are tighter crops of the same captures.
+
+## Compliance declarations, which the public API cannot see
+
+A third thing that lives only on the App Store Connect website, after App
+Privacy and alongside the `demoAccountRequired` trap below. `asc review
+doctor` says so rather than checking it:
+
+```bash
+asc web apps declarations list --app 6833662343
+```
+
+Two exist on this app, and neither is marked `required`:
+
+| Requirement | What it is | State |
+| --- | --- | --- |
+| `DAC7` | EU tax reporting for sellers | `COLLECTED` |
+| `MEDICAL_DEVICE` | whether the app is a regulated medical device | `COLLECTED`, declared false, for EEA, GBR and USA |
+
+`MEDICAL_DEVICE` sat at `PENDING_COLLECTION` until it was answered an hour
+before submission. Nothing said it would block, and it may well not have. But
+an unanswered compliance form is the same shape of problem as a privacy label
+that is declared and never published, and that one does block:
+
+```bash
+asc web apps medical-device set --app 6833662343 --declared false
+```
 
 ## Review notes
 
