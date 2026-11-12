@@ -84,3 +84,9 @@ footer a { margin: 0 9px; }
   ul.plain li { flex-direction: column; gap: 2px; }
   ul.plain .k { flex: none; }
 }
+
+.path {
+  font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--accent-soft); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; overflow-x: auto;
+}
