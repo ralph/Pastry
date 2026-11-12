@@ -67,6 +67,21 @@ def pleats(rim_y, rim_rx, rim_ry, base_y, base_rx, base_ry, n=12, step=3):
     return " ".join(out)
 
 
+def swirl_turns(n, y0=542, y1=346, rx0=206, rx1=112, ry0=76, ry1=48, wobble=13):
+    """n turns of piped frosting, interpolated between a fixed bottom and top
+    ellipse. Keeping the ends fixed means the swirl's height and taper stay put
+    however many turns there are -- only the banding gets coarser or finer.
+    The small alternating nudge off-centre is what reads as a spiral."""
+    out = []
+    for i in range(n):
+        t = i / (n - 1)  # 0 at the base, 1 at the tip
+        out.append((MID + wobble * (1 - t) * math.sin(i * 2.3),
+                    y0 + (y1 - y0) * t,
+                    rx0 + (rx1 - rx0) * t,
+                    ry0 + (ry1 - ry0) * t))
+    return out
+
+
 def swirl(turns):
     """One ellipse per turn of piped frosting, biggest and lowest first. Each
     turn carries its own top-light gradient, so where the next turn overlaps it
@@ -86,7 +101,7 @@ G = {
     "shine":    (("#FFFFFF", "#FFFFFF"), (0, 0, 0, 1)),
 }
 
-BG = {"light": ("#FFE9EA", "#FFBCC9"), "dark": ("#5E323B", "#2B151A")}
+BG = {"light": ("#FFF3EF", "#FFC8D2"), "dark": ("#5E323B", "#2B151A")}
 
 CASES = {
     "slate":  ("#CBD9E0", "#9FB4C0"),
@@ -129,34 +144,23 @@ CONCEPTS = []
 
 # Layers are listed FRONT to BACK, matching icon.json's convention.
 
-# =============================================== A. Three-quarter, swirl + pleats
-CONCEPTS.append({
-    "id": "tq-swirl", "title": "Three-quarter",
-    "line": "The full read: piped swirl, a little cake showing, pleated case seen slightly from above.",
-    "layers": cherry_layers()
-    + [L(f"swirl-{i}", d, "frosting") for i, d in enumerate(reversed(swirl(SWIRL)))]
-    + [L("pleats", PLEAT_D, "pleat"),
-       L("case", CASE_D, "case"),
-       L("cake", CAKE_D, "cake")]})
 
-# ============================================ B. Three-quarter, swirl, plain case
-CONCEPTS.append({
-    "id": "tq-plain", "title": "Plain case",
-    "line": "The same view with the pleats dropped — quieter, and one less thing to lose when small.",
-    "layers": cherry_layers()
-    + [L(f"swirl-{i}", d, "frosting") for i, d in enumerate(reversed(swirl(SWIRL)))]
-    + [L("case", CASE_D, "case"),
-       L("cake", CAKE_D, "cake")]})
+def variant(cid, title, line, n):
+    return {"id": cid, "title": title, "line": line,
+            "layers": cherry_layers()
+            + [L(f"swirl-{i}", d, "frosting")
+               for i, d in enumerate(reversed(swirl(swirl_turns(n))))]
+            + [L("pleats", PLEAT_D, "pleat"),
+               L("case", CASE_D, "case"),
+               L("cake", CAKE_D, "cake")]}
 
-# ============================================== C. Three-quarter, dome + pleats
-CONCEPTS.append({
-    "id": "tq-dome", "title": "Soft dome",
-    "line": "One rounded cap instead of a swirl, pleats kept — the most minimal of the three.",
-    "layers": cherry_layers()
-    + [L("frosting", dome(MID, 600, 216, 250), "frosting"),
-       L("pleats", PLEAT_D, "pleat"),
-       L("case", CASE_D, "case"),
-       L("cake", CAKE_D, "cake")]})
+
+CONCEPTS.append(variant(
+    "tq5", "Five turns", "Where we were \u2014 the finest banding.", 5))
+CONCEPTS.append(variant(
+    "tq4", "Four turns", "One turn fewer. Same height and taper, slightly coarser bands.", 4))
+CONCEPTS.append(variant(
+    "tq3", "Three turns", "Two turns fewer \u2014 the quietest, and the closest to a plain cap.", 3))
 
 
 def squircle(size=C, n=5.0, steps=76):
