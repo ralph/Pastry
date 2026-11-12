@@ -85,12 +85,11 @@ code, so the risk is a good deal smaller than it first looked.
    sandbox entitlements, signs with a distribution identity and an embedded
    provisioning profile, and hands the installer package to App Store Connect.
    The certificates, the profile and the three secrets all exist
-   (`RELEASE_SETUP.md` lists them), and the job has run green on a clean
-   runner — [run 43186294288](https://github.com/ralph/Pastry/actions/runs/43186294288).
-   The package it produced is universal, sandboxed, carries the embedded
-   profile and `com.apple.application-identifier`, and is signed by the
-   installer certificate. Only the upload itself is untried, because a
-   manual run deliberately stops short of it.
+   (`RELEASE_SETUP.md` lists them). **It has shipped.** Tag `v0.1.1` ran the
+   whole path including the upload —
+   [run 43226486857](https://github.com/ralph/ferdinand/actions/runs/43226486857)
+   — and `Pastry-0.1.1.pkg`, build `12.1`, reached App Store Connect, where
+   Apple processed it to `VALID` within a minute.
 5. ~~Create the app record and attach the metadata~~ — done, app `6833662343`,
    with four screenshots. See `metadata.md`.
 6. ~~Fill in the App Privacy questionnaire~~ — done, declared and published as
@@ -100,7 +99,19 @@ code, so the risk is a good deal smaller than it first looked.
    and not in this repository, which is where it belongs. See `metadata.md`,
    including the `demoAccountRequired` trap.
 
-Which leaves step 4's build as the only thing between this and a submission.
+Which leaves two things, neither of them a build.
+
+The uploaded build is `0.1.1` and the version record is `0.1.0`, so they
+cannot attach to each other. Renaming the record — which is allowed while it
+sits in `PREPARE_FOR_SUBMISSION` — clears `build.required.missing`, and the
+What's New field becomes editable only once a build is attached, so that
+warning goes with it.
+
+And nobody is a TestFlight tester yet. The build's `internalBuildState` is
+`READY_FOR_BETA_TESTING` and its `externalBuildState` is
+`READY_FOR_BETA_SUBMISSION`, but there are no beta groups on the app, so it
+appears in nobody's TestFlight. Internal testing needs a group with an App
+Store Connect user in it; external testing needs a beta review on top.
 
 ## What is not blocked
 

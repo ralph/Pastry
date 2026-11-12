@@ -270,7 +270,14 @@ One blocking error remains, down from thirty:
 
 | Check | What it needs |
 | --- | --- |
-| `build.required.missing` | a Mac App Store build — see `submission-blocker.md` step 4 |
+| `build.required.missing` | a build *attached to this version* |
+
+A build exists — `12.1`, uploaded on 2026-11-12 from tag `v0.1.1`, processed
+to `VALID`. It cannot attach to this record while the record says `0.1.0` and
+the build belongs to the `0.1.1` train, so the version string has to move
+first. Build numbers come from the workflow as
+`GITHUB_RUN_NUMBER.GITHUB_RUN_ATTEMPT`, and Apple will refuse any upload
+whose number it has already seen.
 
 Screenshots and App Privacy are done. The `privacy.publish_state.unverified`
 line `asc validate` prints alongside these is an info note about the public
