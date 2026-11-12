@@ -84,11 +84,13 @@ code, so the risk is a good deal smaller than it first looked.
    `app-store` job in `.github/workflows/release.yml`. It archives with the
    sandbox entitlements, signs with a distribution identity and an embedded
    provisioning profile, and hands the installer package to App Store Connect.
-   The certificates and the profile now exist (`RELEASE_SETUP.md` lists them),
-   and the whole path has been run by hand against them: the archive is
-   sandboxed and carries the profile, and `exportArchive` produces a universal
-   installer package signed by the installer certificate. Only the upload
-   itself is untried. What remains is setting the three repository secrets.
+   The certificates, the profile and the three secrets all exist
+   (`RELEASE_SETUP.md` lists them), and the job has run green on a clean
+   runner — [run 43186294288](https://github.com/ralph/Pastry/actions/runs/43186294288).
+   The package it produced is universal, sandboxed, carries the embedded
+   profile and `com.apple.application-identifier`, and is signed by the
+   installer certificate. Only the upload itself is untried, because a
+   manual run deliberately stops short of it.
 5. ~~Create the app record and attach the metadata~~ — done, app `6833662343`,
    with four screenshots. See `metadata.md`.
 6. Add the review contact details (a phone number this repository should not
