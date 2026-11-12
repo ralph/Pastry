@@ -1,0 +1,149 @@
+name: Site
+
+# The site in site/ — the landing page, and the support and privacy pages
+# whose URLs are on the App Store record. A dead privacy policy URL is a
+# straightforward App Store rejection, which is why the links are checked
+# on every pull request that touches the site rather than only on deploy.
+#
+# It is served at pastry.rvdh.de. site/CNAME is what holds the custom
+# domain: a deploy from Actions replaces everything Pages is serving, so a
+# CNAME that lived only in the repository settings would be dropped by the
+# first deploy and the domain would revert to github.io.
+
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/site.yml']
+  pull_request:
+    paths: ['site/**', '.github/workflows/site.yml']
+  workflow_dispatch:
+
+concurrency:
+  # Never cancel a deploy half-way: Pages would be left serving whichever
+  # of the two uploads happened to land.
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every asset on this site has been renamed at least once — the
+      # screenshots became WebP, the header icon dropped from 512 to 256 —
+      # and a stale reference is invisible until someone loads the page.
+      - name: Check that every link and asset resolves
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re, sys
+          from pathlib import Path
+
+          root = Path("site")
+          # Taken from CNAME rather than written here, so the domain lives
+          # in exactly one place and og:url cannot drift away from it.
+          origin = "https://" + (root / "CNAME").read_text().strip() + "/"
+          links = re.compile(r'(?:href|src)="([^"]+)"')
+          # Only the two that carry URLs. og:title and og:description are
+          # prose and would resolve to nothing.
+          social = re.compile(r'property="(og:(?:image|url))" content="([^"]+)"')
+
+          def resolve(page, ref):
+              """Where a reference points, or None if it leaves the site."""
+              if ref.startswith(origin):
+                  target = root / ref[len(origin):]
+              elif ref.startswith(("http://", "https://", "#", "mailto:", "data:")):
+                  return None
+              else:
+                  target = page.parent / ref
+              # A directory URL is served by its index.html.
+              if ref.endswith("/"):
+                  target = target / "index.html"
+              return target.resolve()
+
+          problems, referenced = [], set()
+          for page in sorted(root.rglob("*.html")):
+              text = page.read_text(encoding="utf-8")
+              for ref in links.findall(text) + [u for _, u in social.findall(text)]:
+                  target = resolve(page, ref)
+                  if target is None:
+                      continue
+                  referenced.add(target)
+                  if not target.exists():
+                      problems.append(f"{page}: {ref} -> missing")
+
+          # The social preview has to be absolute and on this domain, or no
+          # scraper resolves it and shared links render without an image.
+          found = dict(social.findall((root / "index.html").read_text(encoding="utf-8")))
+          for prop in ("og:image", "og:url"):
+              if prop not in found:
+                  problems.append(f"site/index.html: {prop} is missing")
+              elif not found[prop].startswith(origin):
+                  problems.append(f"site/index.html: {prop} does not start with {origin}")
+
+          # Anything shipped but unreachable is weight on a page people wait
+          # for. Two icons were already sitting here that nothing used.
+          for asset in sorted((root / "assets").iterdir()):
+              if asset.resolve() not in referenced:
+                  problems.append(f"{asset}: shipped but referenced by nothing")
+
+          # Deduped: a link in both the nav and the footer is one mistake.
+          problems = list(dict.fromkeys(problems))
+          for problem in problems:
+              print(f"::error::{problem}")
+          print(f"{'FAILED' if problems else 'OK'}: {len(problems)} problem(s)")
+          sys.exit(1 if problems else 0)
+          PY
+
+  deploy:
+    needs: check
+    # A pull request checks the links and stops there; it has no business
+    # publishing anything.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pages is not enabled on this repository yet, and cannot be while
+      # it is private on a free plan. Rather than turn main red on every
+      # push until it is, say so and stop — the same way release.yml
+      # treats a missing signing secret.
+      - name: Is Pages enabled?
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" >/dev/null 2>&1; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::GitHub Pages is not enabled for ${GITHUB_REPOSITORY}, so the site was checked but not published."
+            echo "::warning::Settings > Pages > Source: GitHub Actions. The repository has to be public first,"
+            echo "::warning::and pastry.rvdh.de needs a CNAME record pointing at ralph.github.io."
+          fi
+
+      - name: Configure Pages
+        if: steps.pages.outputs.enabled == 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Upload the site
+        if: steps.pages.outputs.enabled == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy
+        id: deployment
+        if: steps.pages.outputs.enabled == 'true'
+        uses: actions/deploy-pages@v4

@@ -136,14 +136,19 @@ macOS 26 or later. Pasting into other applications uses macOS Accessibility, whi
 
 | Field | Value |
 | --- | --- |
-| Marketing URL | `https://ralph.github.io/Pastry/` |
-| Support URL | `https://ralph.github.io/Pastry/support/` |
-| Privacy Policy URL | `https://ralph.github.io/Pastry/privacy/` |
+| Marketing URL | `https://pastry.rvdh.de/` |
+| Support URL | `https://pastry.rvdh.de/support/` |
+| Privacy Policy URL | `https://pastry.rvdh.de/privacy/` |
 
-All three are set on the record and **none of them resolves yet**: the
-repository is private, so GitHub Pages cannot publish. Apple accepted them
-without reachability checks at this stage, but a dead privacy policy URL will
-fail review.
+All three are set on the record and **none of them resolves yet**. The DNS is
+done — `pastry.rvdh.de` is a CNAME to `ralph.github.io` and already answers —
+and `.github/workflows/site.yml` will publish `site/` the moment Pages is
+switched on. What is left is that Pages cannot be switched on while
+`ralph/Pastry` is private on a free plan, so the repository has to go public
+first.
+
+Apple accepted the URLs without reachability checks at this stage. Review will
+not: a dead privacy policy URL fails it.
 
 ## App Privacy
 
