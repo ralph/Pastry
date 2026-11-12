@@ -22,7 +22,7 @@ The workflow can be run by hand. It builds, signs and notarizes exactly as a
 tag would, but publishes nothing:
 
 ```bash
-gh workflow run Release --repo ralph/ferdinand --ref main -f version=0.1.0
+gh workflow run Release --repo ralph/Pastry --ref main -f version=0.1.0
 ```
 
 The version is only for the dry run — pass one that exists in the changelog to
@@ -32,7 +32,7 @@ attached to the run as an artifact either way.
 ## The six secrets
 
 Add these under **Settings → Secrets and variables → Actions** in the
-`ralph/ferdinand` repository.
+`ralph/Pastry` repository.
 
 | Secret | What it is |
 | --- | --- |
@@ -172,15 +172,15 @@ asc profiles download --id PROFILE_ID --output Pastry.provisionprofile
 ### Setting the three secrets
 
 ```bash
-base64 -i appstore.p12 | gh secret set APPSTORE_CERTIFICATES_P12 --repo ralph/ferdinand
+base64 -i appstore.p12 | gh secret set APPSTORE_CERTIFICATES_P12 --repo ralph/Pastry
 ```
 
 ```bash
-gh secret set APPSTORE_CERTIFICATES_PASSWORD --repo ralph/ferdinand < p12.password
+gh secret set APPSTORE_CERTIFICATES_PASSWORD --repo ralph/Pastry < p12.password
 ```
 
 ```bash
-base64 -i Pastry.provisionprofile | gh secret set APPSTORE_PROVISIONING_PROFILE --repo ralph/ferdinand
+base64 -i Pastry.provisionprofile | gh secret set APPSTORE_PROVISIONING_PROFILE --repo ralph/Pastry
 ```
 
 Everything here expires after a year, and the job starts failing when it does.
@@ -215,13 +215,13 @@ record is not enough — the deploy reports success and the domain still 404s.
 Set it explicitly:
 
 ```bash
-gh api -X PUT repos/ralph/ferdinand/pages -f cname=pastry.rvdh.de
+gh api -X PUT repos/ralph/Pastry/pages -f cname=pastry.rvdh.de
 ```
 
 Then wait for the certificate and turn on HTTPS:
 
 ```bash
-gh api -X PUT repos/ralph/ferdinand/pages -F https_enforced=true
+gh api -X PUT repos/ralph/Pastry/pages -F https_enforced=true
 ```
 
 `site/CNAME` is still needed, for the opposite reason: Pages serves whatever

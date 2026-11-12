@@ -87,7 +87,7 @@ code, so the risk is a good deal smaller than it first looked.
    The certificates, the profile and the three secrets all exist
    (`RELEASE_SETUP.md` lists them). **It has shipped.** Tag `v0.1.1` ran the
    whole path including the upload —
-   [run 43226486857](https://github.com/ralph/ferdinand/actions/runs/43226486857)
+   [run 43226486857](https://github.com/ralph/Pastry/actions/runs/43226486857)
    — and `Pastry-0.1.1.pkg`, build `12.1`, reached App Store Connect, where
    Apple processed it to `VALID` within a minute.
 5. ~~Create the app record and attach the metadata~~ — done, app `6833662343`,
