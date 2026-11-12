@@ -228,19 +228,32 @@ The two site images in `site/assets/` are tighter crops of the same captures.
 
 ## Review notes
 
-Not yet on the record: creating review details requires a contact first name,
-last name, **phone number** and email, and the phone number is not something
-this repository should hold. Add it with:
+On the record: review detail `cf439c93-b18f-4052-81ce-a6439eb1d58a`, with the
+contact name, email and phone, and the notes from
+`docs/appstore/review-notes.txt` — which is where they live, so the document
+and the record cannot drift apart.
+
+**`demoAccountRequired` comes back `true`.** `asc review details-create`
+documents the flag as defaulting to false, and the created record said
+otherwise. Left alone it tells App Review to expect sign-in credentials for an
+app whose own notes say there is nothing to sign in to, and no credentials are
+attached. Check it after creating, and turn it off:
+
+```bash
+asc review details-update --id REVIEW_DETAIL_ID --demo-account-required=false
+```
+
+To recreate this from nothing:
 
 ```bash
 asc review details-create --version-id 4b36da2c-8b65-4331-92db-22165befc675 \
   --contact-first-name Ralph --contact-last-name "von der Heyden" \
-  --contact-email YOU@example.com --contact-phone "+49 ..." \
+  --contact-email YOUR@email --contact-phone "+49..." \
   --notes "$(cat docs/appstore/review-notes.txt)"
 ```
 
-The notes live in `docs/appstore/review-notes.txt`, which is what the command
-above reads — they are not repeated here, so the two cannot drift apart.
+The phone has to carry a `+` and a country code, and `details-create` fails on
+an existing record — pass `--if-exists update` to change one.
 
 ## What's New
 
@@ -254,12 +267,11 @@ The first release of Pastry.
 
 ## What `asc validate` still reports
 
-Two blocking errors remain, down from thirty:
+One blocking error remains, down from thirty:
 
 | Check | What it needs |
 | --- | --- |
 | `build.required.missing` | a Mac App Store build — see `submission-blocker.md` step 4 |
-| `review_details.missing` | the contact details above |
 
 Screenshots and App Privacy are done. The `privacy.publish_state.unverified`
 line `asc validate` prints alongside these is an info note about the public

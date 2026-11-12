@@ -95,8 +95,12 @@ code, so the risk is a good deal smaller than it first looked.
    with four screenshots. See `metadata.md`.
 6. ~~Fill in the App Privacy questionnaire~~ — done, declared and published as
    Data Not Collected through `asc web privacy`. See `metadata.md`.
-7. Add the review contact details. Needs a phone number, which is the one
-   thing here that this repository should not hold.
+7. ~~Add the review contact details~~ — done, review detail
+   `cf439c93-b18f-4052-81ce-a6439eb1d58a`. The phone number is on the record
+   and not in this repository, which is where it belongs. See `metadata.md`,
+   including the `demoAccountRequired` trap.
+
+Which leaves step 4's build as the only thing between this and a submission.
 
 ## What is not blocked
 
