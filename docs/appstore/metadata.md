@@ -239,21 +239,8 @@ asc review details-create --version-id 4b36da2c-8b65-4331-92db-22165befc675 \
   --notes "$(cat docs/appstore/review-notes.txt)"
 ```
 
-The notes themselves:
-
-```
-Pastry is a clipboard manager. It needs macOS Accessibility permission to
-paste into the frontmost application on the user's behalf, which it requests
-the first time the user chooses a clipping. Without the permission the app
-still works: the chosen clipping goes onto the system clipboard and the user
-pastes it themselves.
-
-To test: copy two or three different pieces of text, then hold Shift-Command-V
-and tap V to step back through them. Release the modifiers to paste. The
-scissors icon in the menu bar shows the same history with a search field.
-
-There is no account, no network access and nothing to sign in to.
-```
+The notes live in `docs/appstore/review-notes.txt`, which is what the command
+above reads — they are not repeated here, so the two cannot drift apart.
 
 ## What's New
 
