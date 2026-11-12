@@ -23,6 +23,9 @@ jobs:
     # this one goes both workflows fail — this one at tag-push time, which is
     # the worst moment to find out. Bump both together, here and in ci.yml.
     runs-on: macos-26
+    # Read by the app-store job below, so the version is worked out once.
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,56 +64,31 @@ jobs:
       # A missing certificate is not a failure: the build still runs, so the
       # workflow can be exercised before the secrets exist.
       - name: Import the signing certificate
+        id: keychain
+        uses: ./.github/actions/signing-keychain
+        with:
+          certificates: ${{ secrets.CERTIFICATES_P12 }}
+          password: ${{ secrets.CERTIFICATES_PASSWORD }}
+          secret-name: CERTIFICATES_P12
+
+      - name: Decide whether to sign
         id: signing
         env:
-          CERTIFICATE: ${{ secrets.CERTIFICATES_P12 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATES_PASSWORD }}
+          IMPORTED: ${{ steps.keychain.outputs.imported }}
           TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
         run: |
           set -euo pipefail
-          if [ -z "${CERTIFICATE}" ]; then
+          if [ "$IMPORTED" != "true" ]; then
             echo "signed=false" >> "$GITHUB_OUTPUT"
             echo "::warning::No CERTIFICATES_P12 secret; building unsigned."
-            exit 0
-          fi
           # Signing manually without a team fails at codesign rather than
           # degrading, so treat it the same as having no certificate.
-          if [ -z "${TEAM_ID}" ]; then
+          elif [ -z "${TEAM_ID}" ]; then
             echo "signed=false" >> "$GITHUB_OUTPUT"
             echo "::warning::CERTIFICATES_P12 is set but NOTARY_TEAM_ID is not; building unsigned."
-            exit 0
+          else
+            echo "signed=true" >> "$GITHUB_OUTPUT"
           fi
-          keychain="$RUNNER_TEMP/build.keychain-db"
-          password="$(uuidgen)"
-          # Recorded before the key goes in, not after the setup succeeds:
-          # a failure in between would otherwise leave the cleanup step with
-          # nothing to delete and the private key sitting in a keychain.
-          echo "keychain=$keychain" >> "$GITHUB_OUTPUT"
-          security create-keychain -p "$password" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$password" "$keychain"
-          # Armed before the file exists, so a failed decode or import cannot
-          # leave the private key sitting in RUNNER_TEMP.
-          trap 'rm -f "$RUNNER_TEMP/cert.p12"' EXIT
-          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          # Checked before importing, because security's own complaint for a
-          # malformed secret is "Unknown format in import", which sounds like
-          # the certificate is wrong when the usual cause is a truncated
-          # paste. This separates a damaged secret from a wrong password.
-          if ! openssl asn1parse -inform DER -in "$RUNNER_TEMP/cert.p12" >/dev/null 2>&1; then
-            echo "::error::CERTIFICATES_P12 did not decode to a valid PKCS#12."
-            echo "::error::It is usually a truncated paste. Set it from the file instead:"
-            echo "::error::  base64 -i YourCert.p12 | gh secret set CERTIFICATES_P12 --repo ralph/Pastry"
-            exit 1
-          fi
-          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" \
-            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          # Without this, codesign prompts for keychain access and hangs.
-          security set-key-partition-list -S apple-tool:,apple:,codesign: \
-            -s -k "$password" "$keychain" >/dev/null
-          security list-keychains -d user -s "$keychain" \
-            $(security list-keychains -d user | tr -d '"')
-          echo "signed=true" >> "$GITHUB_OUTPUT"
 
       - name: Build
         env:
@@ -320,5 +298,253 @@ jobs:
       # Matters on a self-hosted runner, where the keychain and the user's
       # search list would otherwise outlive the job.
       - name: Remove the signing keychain
-        if: always() && steps.signing.outputs.keychain != ''
-        run: security delete-keychain "${{ steps.signing.outputs.keychain }}" || true
+        if: always() && steps.keychain.outputs.keychain != ''
+        run: security delete-keychain "${{ steps.keychain.outputs.keychain }}" || true
+
+  # The Mac App Store is a second channel with its own rules: sandboxed,
+  # signed with a distribution identity instead of Developer ID, wrapped in a
+  # signed installer package, and handed to App Store Connect rather than
+  # attached to a GitHub release. Nothing it produces reaches the release, so
+  # a failure here cannot spoil the download everyone actually uses.
+  #
+  # Like the job above it degrades rather than failing when the secrets are
+  # absent, so the path can be exercised before any of it is set up.
+  app-store:
+    # After the Developer ID build, not alongside it. There is no point
+    # shipping to the store a build whose own release failed, and running
+    # them in sequence keeps the two signing keychains out of each other's
+    # way. It also means the tests have already run.
+    needs: release
+    # Bump with the other two, in this file and in ci.yml.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        # v1.7.0, pinned to a commit for the same reason as above: this job
+        # holds a distribution certificate and an API key.
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4
+        with:
+          xcode-version: '26'
+
+      - name: Import the distribution certificates
+        id: keychain
+        uses: ./.github/actions/signing-keychain
+        with:
+          certificates: ${{ secrets.APPSTORE_CERTIFICATES_P12 }}
+          password: ${{ secrets.APPSTORE_CERTIFICATES_PASSWORD }}
+          secret-name: APPSTORE_CERTIFICATES_P12
+
+      - name: Set up store signing
+        id: store
+        env:
+          IMPORTED: ${{ steps.keychain.outputs.imported }}
+          KEYCHAIN: ${{ steps.keychain.outputs.keychain }}
+          PROFILE: ${{ secrets.APPSTORE_PROVISIONING_PROFILE }}
+          TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          # A string rather than an array: macOS ships bash 3.2, where
+          # ${#array[@]} on an empty array is an unbound variable under
+          # set -u — which is exactly the case this has to handle.
+          missing=""
+          [ "$IMPORTED" = "true" ] || missing="$missing APPSTORE_CERTIFICATES_P12"
+          [ -n "${PROFILE}" ] || missing="$missing APPSTORE_PROVISIONING_PROFILE"
+          [ -n "${TEAM_ID}" ] || missing="$missing NOTARY_TEAM_ID"
+          if [ -n "$missing" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Skipping the Mac App Store build; missing$missing."
+            exit 0
+          fi
+          # Whichever the certificate turns out to be. "Apple Distribution"
+          # is the modern unified certificate and "3rd Party Mac Developer
+          # Application" the older Mac-only one; both are valid for the
+          # store, and reading it out of the keychain means either works
+          # without the workflow having to know which was created.
+          identity="$(security find-identity -v -p codesigning "$KEYCHAIN" \
+            | grep -oE '"(Apple Distribution|3rd Party Mac Developer Application)[^"]*"' \
+            | head -1 | tr -d '"' || true)"
+          if [ -z "$identity" ]; then
+            echo "::error::APPSTORE_CERTIFICATES_P12 carries no Apple Distribution or"
+            echo "::error::3rd Party Mac Developer Application identity. It wants the"
+            echo "::error::Mac App Distribution certificate, not the Developer ID one."
+            exit 1
+          fi
+          # Checked separately because its absence fails much later, inside
+          # exportArchive, with a message about productbuild that does not
+          # mention the missing certificate.
+          if ! security find-identity -v "$KEYCHAIN" | grep -q 'Mac Developer Installer'; then
+            echo "::error::No 3rd Party Mac Developer Installer identity. The store"
+            echo "::error::takes a signed installer package, so the .p12 has to hold"
+            echo "::error::both certificates."
+            exit 1
+          fi
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+          # Xcode finds a profile by searching this directory, so the file
+          # name means nothing to it — a fixed one just stops a re-run on a
+          # self-hosted runner from piling up copies.
+          dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$dir"
+          file="$dir/pastry-app-store.provisionprofile"
+          echo "profile=$file" >> "$GITHUB_OUTPUT"
+          printf '%s' "$PROFILE" | base64 --decode > "$file"
+          # A profile is CMS-signed, so its contents come out through
+          # `security cms` rather than plutil.
+          plist="$RUNNER_TEMP/profile.plist"
+          if ! security cms -D -i "$file" > "$plist" 2>/dev/null; then
+            echo "::error::APPSTORE_PROVISIONING_PROFILE is not a provisioning profile."
+            echo "::error::It is usually a truncated paste. Set it from the file:"
+            echo "::error::  base64 -i Pastry.provisionprofile | gh secret set APPSTORE_PROVISIONING_PROFILE --repo ralph/Pastry"
+            exit 1
+          fi
+          name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$plist")"
+          echo "profile-name=$name" >> "$GITHUB_OUTPUT"
+          echo "Signing as $identity under profile \"$name\""
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - name: Archive for the store
+        if: steps.store.outputs.ready == 'true'
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          IDENTITY: ${{ steps.store.outputs.identity }}
+          PROFILE_NAME: ${{ steps.store.outputs.profile-name }}
+        run: |
+          set -euo pipefail
+          # The build number has to rise with every upload of a given
+          # version, and it is the same one the DMG in this run carries.
+          xcodebuild archive \
+            -project Pastry.xcodeproj -scheme Pastry -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath "$RUNNER_TEMP/Pastry.xcarchive" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$IDENTITY" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            OTHER_CODE_SIGN_FLAGS=--timestamp \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+            CODE_SIGN_ENTITLEMENTS=Pastry/Pastry-AppStore.entitlements
+
+      # The sandbox is applied from the command line rather than from the
+      # project, precisely so it never reaches the DMG build. That makes it
+      # exactly the kind of setting that can silently stop applying, and the
+      # store's rejection for it arrives long after the upload.
+      - name: Check the archive before exporting it
+        if: steps.store.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/Pastry.xcarchive/Products/Applications/Pastry.app"
+          test -d "$app" || { echo "::error::No app in the archive at $app"; exit 1; }
+          codesign --verify --strict --verbose=2 "$app"
+          entitlements="$(codesign -d --entitlements - --xml "$app" 2>/dev/null || true)"
+          if ! printf '%s' "$entitlements" | grep -q 'com.apple.security.app-sandbox'; then
+            echo "::error::The app is not sandboxed, so the store will reject it."
+            echo "::error::CODE_SIGN_ENTITLEMENTS did not take."
+            exit 1
+          fi
+          if printf '%s' "$entitlements" | grep -q 'get-task-allow'; then
+            echo "::error::The executable requests com.apple.security.get-task-allow."
+            echo "::error::Apple rejects that. CODE_SIGN_INJECT_BASE_ENTITLEMENTS must be NO."
+            exit 1
+          fi
+          test -f "$app/Contents/embedded.provisionprofile" || {
+            echo "::error::No embedded provisioning profile; the store will refuse this."
+            exit 1
+          }
+
+      - name: Export the package, and upload it on a tag
+        id: export
+        if: steps.store.outputs.ready == 'true'
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          PROFILE_NAME: ${{ steps.store.outputs.profile-name }}
+          KEY: ${{ secrets.NOTARY_KEY }}
+          KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          # A tag ships. Anything else builds the package and stops, so a
+          # manual run exercises the whole path — archive, sandbox,
+          # installer, export — without putting a build nobody asked for in
+          # front of App Store Connect.
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            destination="upload"
+          else
+            destination="export"
+            echo "::notice::Not a tag; building the package without uploading it."
+          fi
+          if [ "$destination" = "upload" ] \
+             && { [ -z "${KEY}" ] || [ -z "${KEY_ID}" ] || [ -z "${ISSUER_ID}" ]; }; then
+            destination="export"
+            echo "::warning::The App Store Connect API key secrets are incomplete; exporting without uploading."
+          fi
+          plist="$RUNNER_TEMP/export.plist"
+          # The two certificate values are Xcode's automatic selectors
+          # rather than certificate names, so whichever of the two valid
+          # application certificates is installed gets picked.
+          cat > "$plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>$destination</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Mac App Distribution</string>
+            <key>installerSigningCertificate</key><string>Mac Installer Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>de.rvdh.Pastry</key><string>$PROFILE_NAME</string>
+            </dict>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          args=(-exportArchive
+                -archivePath "$RUNNER_TEMP/Pastry.xcarchive"
+                -exportOptionsPlist "$plist"
+                -exportPath "$RUNNER_TEMP/export")
+          if [ "$destination" = "upload" ]; then
+            key="$RUNNER_TEMP/asc-key.p8"
+            trap 'rm -f "$key"' EXIT
+            printf '%s' "$KEY" | base64 --decode > "$key"
+            args+=(-authenticationKeyPath "$key"
+                   -authenticationKeyID "$KEY_ID"
+                   -authenticationKeyIssuerID "$ISSUER_ID")
+          fi
+          xcodebuild "${args[@]}"
+          built="$(find "$RUNNER_TEMP/export" -maxdepth 1 -name '*.pkg' | head -1 || true)"
+          if [ -z "$built" ]; then
+            echo "::error::exportArchive produced no installer package."
+            exit 1
+          fi
+          pkg="Pastry-$VERSION.pkg"
+          cp "$built" "$pkg"
+          echo "pkg=$pkg" >> "$GITHUB_OUTPUT"
+          if [ "$destination" = "upload" ]; then
+            echo "::notice::Uploaded $pkg (build ${GITHUB_RUN_NUMBER}) to App Store Connect."
+            echo "::notice::It still has to be attached to a version and submitted there."
+          fi
+
+      # Not attached to the release: the store package is not something
+      # anyone should download and run by hand. It is here so a failed
+      # upload can be inspected, and so a dry run leaves something behind.
+      - name: Keep the package
+        if: steps.export.outputs.pkg != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pastry-pkg
+          path: ${{ steps.export.outputs.pkg }}
+          if-no-files-found: error
+
+      - name: Remove the provisioning profile
+        if: always() && steps.store.outputs.profile != ''
+        run: rm -f "${{ steps.store.outputs.profile }}"
+
+      - name: Remove the signing keychain
+        if: always() && steps.keychain.outputs.keychain != ''
+        run: security delete-keychain "${{ steps.keychain.outputs.keychain }}" || true

@@ -80,9 +80,13 @@ code, so the risk is a good deal smaller than it first looked.
    never to the DMG build.
 2. ~~Build sandboxed and test that pasting still works~~ — done, see above.
 3. Decide what happens to an existing history.
-4. Add a Mac App Store export path to the release workflow: a different signing
-   identity (`3rd Party Mac Developer Application`), a provisioning profile,
-   and upload through App Store Connect rather than `notarytool`.
+4. ~~Add a Mac App Store export path to the release workflow~~ — done, the
+   `app-store` job in `.github/workflows/release.yml`. It archives with the
+   sandbox entitlements, signs with a distribution identity and an embedded
+   provisioning profile, and hands the installer package to App Store Connect.
+   It needs three secrets and two certificates that do not exist yet;
+   `RELEASE_SETUP.md` says how to make them. Until they do, the job warns and
+   does nothing, so nothing about the DMG release changes.
 5. ~~Create the app record and attach the metadata~~ — done, app `6833662343`,
    with four screenshots. See `metadata.md`.
 6. Add the review contact details (a phone number this repository should not
