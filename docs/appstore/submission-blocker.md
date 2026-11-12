@@ -99,13 +99,17 @@ code, so the risk is a good deal smaller than it first looked.
    and not in this repository, which is where it belongs. See `metadata.md`,
    including the `demoAccountRequired` trap.
 
-Which leaves two things, neither of them a build.
+Which leaves nothing. `asc validate` reports **no blocking errors**, down from
+thirty.
 
-The uploaded build is `0.1.1` and the version record is `0.1.0`, so they
-cannot attach to each other. Renaming the record — which is allowed while it
-sits in `PREPARE_FOR_SUBMISSION` — clears `build.required.missing`, and the
-What's New field becomes editable only once a build is attached, so that
-warning goes with it.
+The record was renamed from `0.1.0` to `0.1.1` and build `12.1` is attached to
+it. Renaming was the whole of it: a build belongs to the train named by its own
+version string, and a record takes builds only from its own train. That is
+allowed while the record sits in `PREPARE_FOR_SUBMISSION`.
+
+What did not follow is What's New. The guess that a build would make it
+editable was wrong — Apple refuses it for a first release, because there is no
+earlier version for anything to be new since. Its warning stays and should.
 
 TestFlight, on the other hand, is running. Beta group **Internal Testers**
 (`477bc0f9-1643-4ee7-9ae2-13eb646a8330`) is internal with

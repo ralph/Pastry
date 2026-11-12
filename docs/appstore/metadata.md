@@ -23,8 +23,9 @@ submission.
 | Bundle ID | `de.rvdh.Pastry` |
 | SKU | `pastry` |
 | Primary language | English (U.S.) |
-| Version | `0.1.0` |
-| Release type | Manual |
+| Version | `0.1.1` |
+| Build | `12.1`, attached |
+| Release type | `AFTER_APPROVAL` — **not** Manual; see below |
 | Price | Free, all territories, available in new territories |
 | Copyright | `2026 Ralph von der Heyden` |
 | Age rating | 4+ (every content question declared none/false) |
@@ -256,28 +257,48 @@ an existing record — pass `--if-exists update` to change one.
 
 ## What's New
 
-Cannot be set yet — Apple returns `Attribute 'whatsNew' cannot be edited at
-this time` for a first version with no build attached. It becomes editable
-once a build is uploaded. The intended text:
+**It cannot be set at all, and that is correct.** Apple returns `Attribute
+'whatsNew' cannot be edited at this time`, and it still does with build `12.1`
+attached — so the earlier guess here, that a build would unlock it, was wrong.
+The field exists to tell people what changed since the version they already
+have, and for a first release there is no such version. App Store Connect does
+not show the field for one.
+
+So the `metadata.required.whats_new` warning from `asc validate` cannot be
+cleared and does not need to be. It will become real for 0.2.0, which is when
+the text matters:
 
 ```
-The first release of Pastry.
+The first release of Pastry.   ← for whatever the second version turns out to be
 ```
 
 ## What `asc validate` still reports
 
-One blocking error remains, down from thirty:
+**No blocking errors**, down from thirty.
 
-| Check | What it needs |
-| --- | --- |
-| `build.required.missing` | a build *attached to this version* |
+| Check | Severity | Standing |
+| --- | --- | --- |
+| `metadata.required.whats_new` | warning | Cannot be cleared on a first release. See above. |
+| `custom_product_pages.keywords.unverified` | info | iOS-only check, skipped on macOS. |
+| `privacy.publish_state.unverified` | info | The public API cannot read the publish state. It is published. |
 
-A build exists — `12.1`, uploaded on 2026-11-12 from tag `v0.1.1`, processed
-to `VALID`. It cannot attach to this record while the record says `0.1.0` and
-the build belongs to the `0.1.1` train, so the version string has to move
-first. Build numbers come from the workflow as
-`GITHUB_RUN_NUMBER.GITHUB_RUN_ATTEMPT`, and Apple will refuse any upload
-whose number it has already seen.
+The build is `12.1`, uploaded on 2026-11-12 from tag `v0.1.1` and processed to
+`VALID`. Attaching it took renaming this record from `0.1.0` first: a build
+belongs to the train named by its own `CFBundleShortVersionString`, and a
+record can only take a build from its own train. Build numbers come from the
+workflow as `GITHUB_RUN_NUMBER.GITHUB_RUN_ATTEMPT`, and Apple refuses any
+upload whose number it has already seen.
+
+### One thing to decide
+
+The record's release type is `AFTER_APPROVAL`, which releases the app to the
+store by itself the moment review passes. This document said "Manual" from the
+beginning, so one of the two is wrong, and the record is what counts:
+
+```bash
+asc versions update --version-id 4b36da2c-8b65-4331-92db-22165befc675 \
+  --release-type MANUAL
+```
 
 Screenshots and App Privacy are done. The `privacy.publish_state.unverified`
 line `asc validate` prints alongside these is an info note about the public
