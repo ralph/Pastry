@@ -107,11 +107,15 @@ sits in `PREPARE_FOR_SUBMISSION` — clears `build.required.missing`, and the
 What's New field becomes editable only once a build is attached, so that
 warning goes with it.
 
-And nobody is a TestFlight tester yet. The build's `internalBuildState` is
-`READY_FOR_BETA_TESTING` and its `externalBuildState` is
-`READY_FOR_BETA_SUBMISSION`, but there are no beta groups on the app, so it
-appears in nobody's TestFlight. Internal testing needs a group with an App
-Store Connect user in it; external testing needs a beta review on top.
+TestFlight, on the other hand, is running. Beta group **Internal Testers**
+(`477bc0f9-1643-4ee7-9ae2-13eb646a8330`) is internal with
+`hasAccessToAllBuilds`, so every future upload joins it without anyone
+assigning anything, and the account holder is in it. Build `12.1` reads
+`internalBuildState: IN_BETA_TESTING`.
+
+Its `externalBuildState` is still `READY_FOR_BETA_SUBMISSION`, and that is the
+line between the two kinds of testing: internal testers need no review from
+Apple, external ones need a beta review before a build reaches them.
 
 ## What is not blocked
 
