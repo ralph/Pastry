@@ -193,6 +193,40 @@ minutes later, after Apple has processed it; it then has to be attached to the
 version and submitted for review by hand. `docs/appstore/metadata.md` has the
 state of the listing.
 
+## The website
+
+`.github/workflows/site.yml` checks the links in `site/` on every pull
+request that touches it, and publishes it to GitHub Pages on a push to `main`.
+It is live at [pastry.rvdh.de](https://pastry.rvdh.de/), which is where the
+App Store record's marketing, support and privacy URLs point.
+
+Three things make that domain work, and missing any one of them leaves a
+green deploy serving nothing:
+
+| | |
+| --- | --- |
+| DNS | a `CNAME` for `pastry.rvdh.de` to `ralph.github.io` |
+| Pages setting | the custom domain, in **Settings → Pages** |
+| `site/CNAME` | the same name, in the deployed artifact |
+
+The second is the one that catches people. **A deploy from Actions does not
+read the artifact's `CNAME` file**, so enabling Pages and adding the DNS
+record is not enough — the deploy reports success and the domain still 404s.
+Set it explicitly:
+
+```bash
+gh api -X PUT repos/ralph/Pastry/pages -f cname=pastry.rvdh.de
+```
+
+Then wait for the certificate and turn on HTTPS:
+
+```bash
+gh api -X PUT repos/ralph/Pastry/pages -F https_enforced=true
+```
+
+`site/CNAME` is still needed, for the opposite reason: Pages serves whatever
+the last deploy uploaded, so without it a later deploy can drop the domain.
+
 ## Cutting a release
 
 The version comes from the tag, so the tag and the bundle cannot disagree:
