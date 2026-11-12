@@ -25,7 +25,7 @@ submission.
 | Primary language | English (U.S.) |
 | Version | `0.1.1` |
 | Build | `12.1`, attached |
-| Release type | `AFTER_APPROVAL` — **not** Manual; see below |
+| Release type | `AFTER_APPROVAL` — ships itself once review passes |
 | Price | Free, all territories, available in new territories |
 | Copyright | `2026 Ralph von der Heyden` |
 | Age rating | 4+ (every content question declared none/false) |
@@ -289,11 +289,14 @@ record can only take a build from its own train. Build numbers come from the
 workflow as `GITHUB_RUN_NUMBER.GITHUB_RUN_ATTEMPT`, and Apple refuses any
 upload whose number it has already seen.
 
-### One thing to decide
+### Release type
 
-The record's release type is `AFTER_APPROVAL`, which releases the app to the
-store by itself the moment review passes. This document said "Manual" from the
-beginning, so one of the two is wrong, and the record is what counts:
+`AFTER_APPROVAL`: the version goes live on the store by itself the moment
+review passes, with no second button to press. This document said "Manual"
+for a while, which was never true of the record — the record is what counts,
+and automatic is the intended behaviour.
+
+To change it, if a later version wants a chosen launch moment:
 
 ```bash
 asc versions update --version-id 4b36da2c-8b65-4331-92db-22165befc675 \
