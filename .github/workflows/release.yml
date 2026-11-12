@@ -101,7 +101,7 @@ jobs:
                 -destination 'generic/platform=macOS'
                 -derivedDataPath build
                 MARKETING_VERSION="$VERSION"
-                CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}")
+                CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}")
           if [ "$SIGNED" = "true" ]; then
             args+=(CODE_SIGN_IDENTITY="Developer ID Application"
                    CODE_SIGN_STYLE=Manual
@@ -351,6 +351,15 @@ jobs:
           [ -n "${PROFILE}" ] || missing="$missing APPSTORE_PROVISIONING_PROFILE"
           [ -n "${TEAM_ID}" ] || missing="$missing NOTARY_TEAM_ID"
           if [ -n "$missing" ]; then
+            # On a tag this is a release that silently does not reach the
+            # store, and a green tick nobody will question. Loud instead.
+            # Anywhere else it is someone exercising the workflow before
+            # the secrets exist, which is what skipping is for.
+            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+              echo "::error::Cannot build for the Mac App Store; missing$missing."
+              echo "::error::This is a tag, so that would ship a release the store never sees."
+              exit 1
+            fi
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::warning::Skipping the Mac App Store build; missing$missing."
             exit 0
@@ -425,12 +434,16 @@ jobs:
           set -euo pipefail
           # The build number has to rise with every upload of a given
           # version, and it is the same one the DMG in this run carries.
+          # The run attempt is in it because the run number is not: it
+          # stays put when you press "Re-run failed jobs", so without it
+          # every retry after a part-finished upload would be refused as a
+          # build number Apple has already seen.
           xcodebuild archive \
             -project Pastry.xcodeproj -scheme Pastry -configuration Release \
             -destination 'generic/platform=macOS' \
             -archivePath "$RUNNER_TEMP/Pastry.xcarchive" \
             MARKETING_VERSION="$VERSION" \
-            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="$IDENTITY" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
@@ -466,7 +479,14 @@ jobs:
             exit 1
           }
 
-      - name: Export the package, and upload it on a tag
+      # Exporting and uploading are two steps, not one exportArchive with
+      # `destination: upload`, for two reasons. The package reaches the
+      # artifact store before anything is sent to Apple, so a rejected
+      # upload leaves something to look at. And Xcode describes the
+      # destination as "exported locally *or* uploaded", so an upload may
+      # well leave no local package — which a combined step would have to
+      # either tolerate or mistake for a failed export.
+      - name: Export the package
         id: export
         if: steps.store.outputs.ready == 'true'
         env:
@@ -475,59 +495,36 @@ jobs:
           PROFILE_NAME: ${{ steps.store.outputs.profile-name }}
           APP_CERT: ${{ steps.store.outputs.app-cert }}
           INSTALLER_CERT: ${{ steps.store.outputs.installer-cert }}
-          KEY: ${{ secrets.NOTARY_KEY }}
-          KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
-          ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
           set -euo pipefail
-          # A tag ships. Anything else builds the package and stops, so a
-          # manual run exercises the whole path — archive, sandbox,
-          # installer, export — without putting a build nobody asked for in
-          # front of App Store Connect.
-          destination="export"
-          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
-            echo "::notice::Not a tag; building the package without uploading it."
-          elif [ -z "${KEY}" ] || [ -z "${KEY_ID}" ] || [ -z "${ISSUER_ID}" ]; then
-            echo "::warning::The App Store Connect API key secrets are incomplete; exporting without uploading."
-          else
-            destination="upload"
-          fi
-          plist="$RUNNER_TEMP/export.plist"
-          # The certificate names come from the keychain rather than being
-          # written here, so whichever of the valid distribution
-          # certificates was created is the one used.
-          cat > "$plist" <<PLIST
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>$destination</string>
-            <key>teamID</key><string>$TEAM_ID</string>
-            <key>signingStyle</key><string>manual</string>
-            <key>signingCertificate</key><string>$APP_CERT</string>
-            <key>installerSigningCertificate</key><string>$INSTALLER_CERT</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>de.rvdh.Pastry</key><string>$PROFILE_NAME</string>
-            </dict>
-            <key>manageAppVersionAndBuildNumber</key><false/>
-          </dict>
-          </plist>
-          PLIST
-          args=(-exportArchive
-                -archivePath "$RUNNER_TEMP/Pastry.xcarchive"
-                -exportOptionsPlist "$plist"
-                -exportPath "$RUNNER_TEMP/export")
-          if [ "$destination" = "upload" ]; then
-            key="$RUNNER_TEMP/asc-key.p8"
-            trap 'rm -f "$key"' EXIT
-            printf '%s' "$KEY" | base64 --decode > "$key"
-            args+=(-authenticationKeyPath "$key"
-                   -authenticationKeyID "$KEY_ID"
-                   -authenticationKeyIssuerID "$ISSUER_ID")
-          fi
-          xcodebuild "${args[@]}"
+          # Written by plistlib rather than a heredoc: these values are
+          # certificate and profile names, and one holder called
+          # "Smith & Sons" would produce XML that does not parse, failing
+          # the export after the archive has already been built.
+          python3 - "$RUNNER_TEMP/export.plist" <<'PY'
+          import os, plistlib, sys
+          with open(sys.argv[1], "wb") as f:
+              plistlib.dump({
+                  "method": "app-store-connect",
+                  "destination": "export",
+                  "teamID": os.environ["TEAM_ID"],
+                  "signingStyle": "manual",
+                  # Read off the keychain, so whichever of the valid
+                  # distribution certificates exists is the one used.
+                  "signingCertificate": os.environ["APP_CERT"],
+                  "installerSigningCertificate": os.environ["INSTALLER_CERT"],
+                  "provisioningProfiles": {
+                      "de.rvdh.Pastry": os.environ["PROFILE_NAME"],
+                  },
+                  # Otherwise Xcode rewrites the build number to whatever
+                  # App Store Connect last saw.
+                  "manageAppVersionAndBuildNumber": False,
+              }, f)
+          PY
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Pastry.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/export"
           built="$(find "$RUNNER_TEMP/export" -maxdepth 1 -name '*.pkg' | head -1 || true)"
           if [ -z "$built" ]; then
             echo "::error::exportArchive produced no installer package."
@@ -536,21 +533,56 @@ jobs:
           pkg="Pastry-$VERSION.pkg"
           cp "$built" "$pkg"
           echo "pkg=$pkg" >> "$GITHUB_OUTPUT"
-          if [ "$destination" = "upload" ]; then
-            echo "::notice::Uploaded $pkg (build ${GITHUB_RUN_NUMBER}) to App Store Connect."
-            echo "::notice::It still has to be attached to a version and submitted there."
-          fi
 
-      # Not attached to the release: the store package is not something
-      # anyone should download and run by hand. It is here so a failed
-      # upload can be inspected, and so a dry run leaves something behind.
+      # Before the upload, and with always(), so the package survives a
+      # rejection — which is the only time anyone wants to look at it.
+      # Not attached to the release: it is not something to download and
+      # run by hand.
       - name: Keep the package
-        if: steps.export.outputs.pkg != ''
+        if: always() && steps.export.outputs.pkg != ''
         uses: actions/upload-artifact@v4
         with:
           name: Pastry-pkg
           path: ${{ steps.export.outputs.pkg }}
           if-no-files-found: error
+
+      # Only a tag ships. A manual run stops at the step above, having
+      # exercised the whole path — archive, sandbox, installer, export —
+      # without putting a build nobody asked for in front of Apple.
+      - name: Upload to App Store Connect
+        if: steps.export.outputs.pkg != '' && github.ref_type == 'tag'
+        env:
+          PKG: ${{ steps.export.outputs.pkg }}
+          KEY: ${{ secrets.NOTARY_KEY }}
+          KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEY}" ] || [ -z "${KEY_ID}" ] || [ -z "${ISSUER_ID}" ]; then
+            echo "::error::The App Store Connect API key secrets are incomplete,"
+            echo "::error::so this tag cannot reach the store. The package is"
+            echo "::error::attached to this run as an artifact."
+            exit 1
+          fi
+          # The same archive and the same options, flipped to upload. The
+          # package this re-exports is byte-for-byte equivalent to the
+          # artifact above, but freshly signed, so the two differ in their
+          # signature timestamps — the artifact is for looking at, not for
+          # shipping.
+          cp "$RUNNER_TEMP/export.plist" "$RUNNER_TEMP/upload.plist"
+          /usr/libexec/PlistBuddy -c "Set :destination upload" "$RUNNER_TEMP/upload.plist"
+          key="$RUNNER_TEMP/asc-key.p8"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$KEY" | base64 --decode > "$key"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Pastry.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/upload.plist" \
+            -exportPath "$RUNNER_TEMP/upload" \
+            -authenticationKeyPath "$key" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID"
+          echo "::notice::Uploaded $PKG (build ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}) to App Store Connect."
+          echo "::notice::It still has to be attached to a version and submitted there."
 
       # Unconditional: rm -f on a profile that was never written is a
       # no-op, and that is cheaper than an output threading a constant
