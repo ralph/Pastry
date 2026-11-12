@@ -140,12 +140,11 @@ macOS 26 or later. Pasting into other applications uses macOS Accessibility, whi
 | Support URL | `https://pastry.rvdh.de/support/` |
 | Privacy Policy URL | `https://pastry.rvdh.de/privacy/` |
 
-All three are set on the record and **none of them resolves yet**. The DNS is
-done — `pastry.rvdh.de` is a CNAME to `ralph.github.io` and already answers —
-and `.github/workflows/site.yml` will publish `site/` the moment Pages is
-switched on. What is left is that Pages cannot be switched on while
-`ralph/Pastry` is private on a free plan, so the repository has to go public
-first.
+All three are set on the record and **all three resolve**.
+`.github/workflows/site.yml` publishes `site/` to GitHub Pages, served over
+HTTPS at `pastry.rvdh.de` — a DNS CNAME to `ralph.github.io`, with the custom
+domain set on the repository itself, because an Actions deploy does not read
+the artifact's `CNAME` file.
 
 Apple accepted the URLs without reachability checks at this stage. Review will
 not: a dead privacy policy URL fails it.
