@@ -546,11 +546,18 @@ jobs:
           path: ${{ steps.export.outputs.pkg }}
           if-no-files-found: error
 
-      # Only a tag ships. A manual run stops at the step above, having
-      # exercised the whole path — archive, sandbox, installer, export —
-      # without putting a build nobody asked for in front of Apple.
+      # Only a tag *push* ships. A manual run stops at the step above,
+      # having exercised the whole path — archive, sandbox, installer,
+      # export — without putting a build nobody asked for in front of
+      # Apple. The event matters as much as the ref: a workflow_dispatch
+      # can be aimed at an existing tag, where github.ref_type is still
+      # "tag", and the dry run would have uploaded and burned a build
+      # number on a release that had already shipped.
       - name: Upload to App Store Connect
-        if: steps.export.outputs.pkg != '' && github.ref_type == 'tag'
+        if: >-
+          steps.export.outputs.pkg != ''
+          && github.event_name == 'push'
+          && github.ref_type == 'tag'
         env:
           PKG: ${{ steps.export.outputs.pkg }}
           KEY: ${{ secrets.NOTARY_KEY }}

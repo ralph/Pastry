@@ -5,10 +5,19 @@ name: Site
 # straightforward App Store rejection, which is why the links are checked
 # on every pull request that touches the site rather than only on deploy.
 #
-# It is served at pastry.rvdh.de. site/CNAME is what holds the custom
-# domain: a deploy from Actions replaces everything Pages is serving, so a
-# CNAME that lived only in the repository settings would be dropped by the
-# first deploy and the domain would revert to github.io.
+# It is served at pastry.rvdh.de, which takes two things, and site/CNAME
+# is only one of them:
+#
+#   1. The repository's Pages custom domain, set in Settings > Pages or
+#      with `gh api -X PUT repos/OWNER/REPO/pages -f cname=pastry.rvdh.de`.
+#      A deploy from Actions does NOT read the artifact's CNAME file, so
+#      without this step the deploy succeeds and the domain still 404s —
+#      which is exactly what happened the first time.
+#   2. site/CNAME, which keeps it. Pages serves whatever the last deploy
+#      uploaded, so a domain set only in the settings is liable to be
+#      dropped and the site falls back to github.io.
+#
+# Plus a DNS CNAME from pastry.rvdh.de to ralph.github.io.
 
 on:
   push:
@@ -18,15 +27,18 @@ on:
     paths: ['site/**', '.github/workflows/site.yml']
   workflow_dispatch:
 
-concurrency:
-  # Never cancel a deploy half-way: Pages would be left serving whichever
-  # of the two uploads happened to land.
-  group: pages
-  cancel-in-progress: false
-
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Per ref, and deliberately not the deploy group below. One shared
+    # group for the whole workflow looks tidier and quietly breaks
+    # publishing: GitHub keeps one pending run per group and cancels the
+    # older one when a newer arrives, so a main deploy waiting its turn
+    # would be thrown away by the next push to any pull request — and the
+    # run that survived would skip deploying, because it is not main.
+    concurrency:
+      group: site-check-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: read
     steps:
@@ -108,6 +120,11 @@ jobs:
     # on the deploy job rather than on the workflow.
     if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
+    # Only deploys share this. Never cancel one half-way: Pages would be
+    # left serving whichever of the two uploads happened to land.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       contents: read
       pages: write
