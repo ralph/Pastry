@@ -11,17 +11,25 @@ composition, rose ground, charcoal scissors) — described below and built by
 `build_icon.py`.
 
 > **A redesign is under review.** The shipping icon reads as too busy: two
-> objects, a diagonal axis, and a lot going on. `cupcake.py` holds four
-> candidates for a replacement — a single round, symmetric, minimal cupcake
-> with no scissors, built from three shapes (case, cream, and one saturated
-> thing on top), everything pastel with subtle gradients, on the same rosy
-> ground. Render them with `cupcake_sheet.py`; the checked-in result is
-> `cupcake-concepts.png`.
+> objects, a diagonal axis, and a lot going on. The replacement drops the
+> scissors and reduces the icon to a single cupcake built from a handful of
+> shapes — the case, the cream, and one saturated thing on top — everything a
+> desaturated pastel with a subtle gradient, on the same rosy ground. The
+> cherry is the only saturated colour in the icon.
 >
-> Nothing in the shipping pipeline points at `cupcake.py` yet. When a
-> candidate is chosen it replaces `concepts.py` as the source of truth and
-> `build_icon.py` is repointed at it; until then `build_icon.py` keeps
-> producing the current icon unchanged.
+> Two candidate sets, by camera angle:
+>
+> | Module | Variants | Sheet |
+> |---|---|---|
+> | `cupcake3q.py` | three-quarter: side on, camera slightly raised | `cupcake3q-concepts.png` |
+> | `cupcake.py` | the two strict angles: flat elevation, and overhead | `cupcake-concepts.png` |
+>
+> Render either with `cupcake_sheet.py [module]` — it defaults to `cupcake3q`.
+>
+> Nothing in the shipping pipeline points at either yet. When a candidate is
+> chosen it replaces `concepts.py` as the source of truth and `build_icon.py`
+> is repointed at it; until then `build_icon.py` keeps producing the current
+> icon unchanged.
 
 ## The shipping design
 
