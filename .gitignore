@@ -23,3 +23,9 @@ Pastry.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
 *.cer
 *.certSigningRequest
 *.mobileprovision
+# .provisionprofile is the macOS spelling of .mobileprovision, and the one
+# this project actually uses. *.pem and *.key are what `asc certificates
+# create --generate-csr` leaves behind: an unencrypted private key.
+*.provisionprofile
+*.pem
+*.key

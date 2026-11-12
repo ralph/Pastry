@@ -1,0 +1,95 @@
+name: Signing keychain
+description: >
+  Import a PKCS#12 signing identity into a throwaway keychain. Used by both
+  release paths — Developer ID for the DMG, Mac App Store for the pkg — so
+  that the careful parts (validating the secret, unlocking for codesign
+  without a prompt, not leaving the private key in RUNNER_TEMP) are written
+  once rather than twice.
+
+  A missing secret is not a failure. The action reports `imported=false` and
+  leaves the caller to decide whether that is worth a warning, because the
+  two callers word it differently.
+
+  Deleting the keychain afterwards is the caller's job: a composite action
+  cannot register a post step. Do it with `if: always()`, keyed off the
+  `keychain` output, which is set before the key goes in.
+
+inputs:
+  certificates:
+    description: Base64 of a .p12 holding the identity, or identities, to import.
+    required: true
+  password:
+    description: The password the .p12 was exported with.
+    required: false
+    default: ''
+  secret-name:
+    description: Name of the secret holding `certificates`, used in error messages.
+    required: false
+    default: CERTIFICATES_P12
+
+outputs:
+  imported:
+    description: '"true" when an identity was imported.'
+    value: ${{ steps.import.outputs.imported }}
+  keychain:
+    description: Path to the keychain, or empty if none was created.
+    value: ${{ steps.import.outputs.keychain }}
+
+runs:
+  using: composite
+  steps:
+    - id: import
+      shell: bash
+      env:
+        CERTIFICATE: ${{ inputs.certificates }}
+        CERTIFICATE_PASSWORD: ${{ inputs.password }}
+        SECRET_NAME: ${{ inputs.secret-name }}
+      run: |
+        set -euo pipefail
+        if [ -z "${CERTIFICATE}" ]; then
+          echo "imported=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        keychain="$RUNNER_TEMP/${SECRET_NAME}.keychain-db"
+        password="$(uuidgen)"
+        # Recorded before the key goes in, not after the setup succeeds:
+        # a failure in between would otherwise leave the cleanup step with
+        # nothing to delete and the private key sitting in a keychain.
+        echo "keychain=$keychain" >> "$GITHUB_OUTPUT"
+        security create-keychain -p "$password" "$keychain"
+        security set-keychain-settings -lut 21600 "$keychain"
+        security unlock-keychain -p "$password" "$keychain"
+        # Armed before the file exists, so a failed decode or import cannot
+        # leave the private key sitting in RUNNER_TEMP.
+        p12="$RUNNER_TEMP/${SECRET_NAME}.p12"
+        trap 'rm -f "$p12"' EXIT
+        printf '%s' "$CERTIFICATE" | base64 --decode > "$p12"
+        # Checked before importing, because security's own complaint for a
+        # malformed secret is "Unknown format in import", which sounds like
+        # the certificate is wrong when the usual cause is a truncated
+        # paste. This separates a damaged secret from a wrong password.
+        if ! openssl asn1parse -inform DER -in "$p12" >/dev/null 2>&1; then
+          echo "::error::${SECRET_NAME} did not decode to a valid PKCS#12."
+          echo "::error::It is usually a truncated paste. Set it from the file instead:"
+          echo "::error::  base64 -i YourCert.p12 | gh secret set ${SECRET_NAME} --repo ${GITHUB_REPOSITORY}"
+          exit 1
+        fi
+        # productbuild and productsign matter only to the App Store path,
+        # where the installer package is signed with a second identity from
+        # the same keychain. Naming a tool that path never uses costs
+        # nothing, and leaving it out costs an afternoon.
+        security import "$p12" -k "$keychain" -P "$CERTIFICATE_PASSWORD" \
+          -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/productsign
+        # Without this, codesign prompts for keychain access and hangs.
+        security set-key-partition-list -S apple-tool:,apple:,codesign: \
+          -s -k "$password" "$keychain" >/dev/null
+        # The word splitting is the point: each keychain already on the
+        # search list has to come back as its own argument, or this
+        # replaces the list rather than prepending to it.
+        # shellcheck disable=SC2046
+        security list-keychains -d user -s "$keychain" \
+          $(security list-keychains -d user | tr -d '"')
+        echo "Imported from ${SECRET_NAME}:"
+        security find-identity -v -p codesigning "$keychain" \
+          | sed -E 's/\) [0-9A-F]{40} /) /'
+        echo "imported=true" >> "$GITHUB_OUTPUT"
