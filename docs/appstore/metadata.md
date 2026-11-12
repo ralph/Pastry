@@ -155,13 +155,36 @@ not: a dead privacy policy URL fails it.
 Every answer is "No". Pastry collects nothing, so the privacy nutrition label
 is **Data Not Collected** with no categories ticked.
 
-This questionnaire is **not** reachable through the API — `asc validate` says
-so itself, and it has to be filled and published in the web UI at
-[appstoreconnect.apple.com/apps/6833662343/appPrivacy](https://appstoreconnect.apple.com/apps/6833662343/appPrivacy).
+**Declared and published.** Data usage `dd5e1b3f-e86a-4e74-8401-e0a3619b0c6f`,
+one tuple, `DATA_NOT_COLLECTED`, no categories and no purposes.
 
-Worth being exact when filling it: the clipboard contents Pastry stores are
-not "collected" in Apple's sense — collection means transmitted off the
-device, and nothing is.
+It is not in the *public* API — which is why `asc validate` still reports
+`privacy.publish_state.unverified` and will keep doing so; it cannot read the
+publish state, so it tells you to go and look. That note is not a failure. The
+web-session API does have it:
+
+```bash
+asc web privacy pull --app 6833662343 --pretty      # current state
+asc web privacy plan --app 6833662343 --file d.json # diff before touching
+asc web privacy apply --app 6833662343 --file d.json
+asc web privacy publish --app 6833662343 --confirm
+```
+
+with `d.json` being the whole of it:
+
+```json
+{ "schemaVersion": 1, "dataUsages": [ { "dataProtections": ["DATA_NOT_COLLECTED"] } ] }
+```
+
+Two things worth knowing if this is ever redone. `pull` reports
+`DATA_NOT_COLLECTED` before anything has been declared — that is a derived
+default, not a saved answer, and only `plan` reveals the difference by showing
+the create. And `apply` does not publish: publishing is a separate call, which
+is the state review actually checks.
+
+Worth being exact about the answer itself: the clipboard contents Pastry
+stores are not "collected" in Apple's sense — collection means transmitted off
+the device, and Pastry has no network code at all.
 
 ## Screenshots
 
@@ -251,5 +274,6 @@ Two blocking errors remain, down from thirty:
 | `build.required.missing` | a Mac App Store build — see `submission-blocker.md` step 4 |
 | `review_details.missing` | the contact details above |
 
-Screenshots are done. The App Privacy questionnaire is not part of
-`asc validate` and still has to be filled in by hand.
+Screenshots and App Privacy are done. The `privacy.publish_state.unverified`
+line `asc validate` prints alongside these is an info note about the public
+API's blind spot, not an outstanding task.

@@ -93,8 +93,10 @@ code, so the risk is a good deal smaller than it first looked.
    manual run deliberately stops short of it.
 5. ~~Create the app record and attach the metadata~~ — done, app `6833662343`,
    with four screenshots. See `metadata.md`.
-6. Add the review contact details (a phone number this repository should not
-   hold) and fill in the App Privacy questionnaire by hand.
+6. ~~Fill in the App Privacy questionnaire~~ — done, declared and published as
+   Data Not Collected through `asc web privacy`. See `metadata.md`.
+7. Add the review contact details. Needs a phone number, which is the one
+   thing here that this repository should not hold.
 
 ## What is not blocked
 
