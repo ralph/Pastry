@@ -3,6 +3,19 @@
 Pastry's own history. Flycut's, up to 1.9.7, is in
 [that project's repository](https://github.com/TermiT/Flycut).
 
+## 0.1.1 — 2026-11-12
+
+An icon of its own, and a menu that lines up.
+
+- A new app icon: a cupcake in three-quarter view — paper case, a sliver of
+  cake, three turns of piped frosting and a cherry. Drawn for this app rather
+  than assembled out of symbols. The menu-bar glyph is unchanged; it is a flat
+  monochrome template and always was a separate thing.
+- The search field spans the width of the menu instead of stopping short of
+  it.
+
+Nothing about what Pastry does has changed.
+
 ## 0.1.0 — 2026-11-11
 
 The first Pastry. A Swift rewrite of Flycut, built from nothing and carrying
