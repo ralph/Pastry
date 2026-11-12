@@ -6,10 +6,24 @@ Sources for the Pastry app bundle icon. This is **not** the menu-bar glyph
 The built bundle lives at **`Pastry/Pastry.icon`**, inside the folder the
 Xcode project synchronises, which is what gets it compiled into the app.
 
-Status: **design chosen, built, confirmed in Icon Composer, and shipping.**
-Angled composition, rose ground, charcoal scissors.
+Status: **shipping design is the cake slice with scissors** (Angled
+composition, rose ground, charcoal scissors) — described below and built by
+`build_icon.py`.
 
-## The design
+> **A redesign is under review.** The shipping icon reads as too busy: two
+> objects, a diagonal axis, and a lot going on. `cupcake.py` holds four
+> candidates for a replacement — a single round, symmetric, minimal cupcake
+> with no scissors, built from three shapes (case, cream, and one saturated
+> thing on top), everything pastel with subtle gradients, on the same rosy
+> ground. Render them with `cupcake_sheet.py`; the checked-in result is
+> `cupcake-concepts.png`.
+>
+> Nothing in the shipping pipeline points at `cupcake.py` yet. When a
+> candidate is chosen it replaces `concepts.py` as the source of truth and
+> `build_icon.py` is repointed at it; until then `build_icon.py` keeps
+> producing the current icon unchanged.
+
+## The shipping design
 
 A simplified side view of a layer-cake slice, taken from a reference photo of a
 pineapple-coconut slice: thick frosting cap, sponge, cream with fruit through
