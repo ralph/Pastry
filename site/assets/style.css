@@ -77,3 +77,8 @@
     ul.plain li { flex-direction: column; gap: 2px; }
     ul.plain .k { flex: none; }
   }
+
+  .shot {
+    display: block; width: 100%; height: auto; margin: 18px 0 2px;
+    border-radius: 10px; border: 1px solid var(--line);
+  }

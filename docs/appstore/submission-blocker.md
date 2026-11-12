@@ -83,7 +83,10 @@ code, so the risk is a good deal smaller than it first looked.
 4. Add a Mac App Store export path to the release workflow: a different signing
    identity (`3rd Party Mac Developer Application`), a provisioning profile,
    and upload through App Store Connect rather than `notarytool`.
-5. Create the app record and attach the metadata.
+5. ~~Create the app record and attach the metadata~~ — done, app `6833662343`,
+   with four screenshots. See `metadata.md`.
+6. Add the review contact details (a phone number this repository should not
+   hold) and fill in the App Privacy questionnaire by hand.
 
 ## What is not blocked
 

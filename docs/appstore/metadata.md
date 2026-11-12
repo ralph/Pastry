@@ -158,6 +158,46 @@ Worth being exact when filling it: the clipboard contents Pastry stores are
 not "collected" in Apple's sense — collection means transmitted off the
 device, and nothing is.
 
+## Screenshots
+
+Four, uploaded to screenshot set `ff679f21-71fa-4cfc-94f2-991fbaad49b6`
+(`APP_DESKTOP`), each 2880×1800 — one of the four sizes Apple accepts for Mac.
+
+| Order | Shot | Headline |
+| --- | --- | --- |
+| 1 | the menu open under the scissors | Everything you copied, one click away. |
+| 2 | the bezel mid-walk, 3 of 10 | Hold ⇧⌘V. Tap back. Let go. |
+| 3 | the menu filtered by a search | Find it by typing. |
+| 4 | Settings, General | Your history, your limits. |
+
+They are real captures of the shipped app, not mock-ups. How they were made,
+because it will have to be repeated for 0.2.0:
+
+- **A demo history.** The app reads
+  `~/Library/Application Support/Pastry/history.json`, so a hand-written one of
+  ten plausible clippings — attributed to Safari, Terminal, Xcode, Notes, Mail
+  and Messages — was placed in a throwaway home and Pastry launched with
+  `CFFIXED_USER_HOME` pointing at it. Note `HOME` alone does **not** work:
+  `FileManager.urls(for: .applicationSupportDirectory, …)` resolves the real
+  home regardless. Nothing of the actual user's was touched or shown.
+- **A backdrop.** A borderless full-screen window drawing a gradient in the
+  site's accent colours (`#FFE9EC` → `#D4687F`), so the translucent menu and
+  bezel sample something real. Capturing a window on its own with
+  `screencapture -l` renders the vibrancy as flat grey — it must be a
+  full-screen capture over a real backdrop, then cropped.
+- **A clean menu bar.** The right-hand side of a real menu bar is full of other
+  apps' icons. An empty stretch of the same bar was stretched across them and
+  the scissors pasted back, which is seamless because the backdrop gradient is
+  vertical only.
+- **The bezel.** Opened by synthesising ⇧⌘V with the modifiers held down, and
+  dismissed with Escape *before* releasing them — releasing would paste into
+  whatever was frontmost.
+- **Alpha.** `screencapture` output carries an alpha channel and App Store
+  Connect rejects it outright, even when every pixel is opaque. Flatten with
+  `-alpha remove -alpha off` before uploading.
+
+The two site images in `site/assets/` are tighter crops of the same captures.
+
 ## Review notes
 
 Not yet on the record: creating review details requires a contact first name,
@@ -199,10 +239,12 @@ The first release of Pastry.
 
 ## What `asc validate` still reports
 
-Three blocking errors remain, down from thirty:
+Two blocking errors remain, down from thirty:
 
 | Check | What it needs |
 | --- | --- |
 | `build.required.missing` | a Mac App Store build — see `submission-blocker.md` step 4 |
-| `screenshots.required.any` | at least one screenshot set |
 | `review_details.missing` | the contact details above |
+
+Screenshots are done. The App Privacy questionnaire is not part of
+`asc validate` and still has to be filled in by hand.
