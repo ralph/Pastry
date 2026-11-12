@@ -41,6 +41,7 @@ app can still be renamed without touching the artwork.
 | `cupcake3q.py` | The geometry and the palette. Single source of truth for the shapes; importable (`by_id("tq3")`) or run it to dump JSON. |
 | `build_icon.py` | Builds `Pastry/Pastry.icon` from that geometry. Owns the layer grouping and the ground. |
 | `preview_icon.py` | Renders the **built bundle** to a PNG contact sheet. Reads `icon.json` and the layer SVGs, so it also checks that the manifest and the artwork agree. |
+| `export_png.py` | Exports the bundle as web-ready PNGs — masked, shadowed, transparent. Refreshes `site/assets/`. |
 | `cupcake_sheet.py` | Renders a candidate *set* side by side — the decision aid, for exploring alternatives. |
 | `cupcake3q-concepts.png` | The turn-count comparison (five / four / three), checked in. |
 | `pastry-icon.png` | The shipping icon, rendered from the bundle, both appearances, 320 → 16 pt. |
@@ -51,10 +52,30 @@ app can still be renamed without touching the artwork.
 cd tools/icon
 python3 build_icon.py       # regenerates Pastry/Pastry.icon
 python3 preview_icon.py     # re-renders pastry-icon.png from the bundle
+python3 export_png.py       # refreshes site/assets/pastry-{256,512}.png
 ```
 
-Stdlib Python 3 only, except `rsvg-convert` (librsvg) for the PNG step; pass
-`--svg-only` to skip it, or open the emitted `.svg` in any browser.
+Stdlib Python 3 only, except `rsvg-convert` (librsvg) for the PNG steps; pass
+`--svg-only` to skip it in `preview_icon.py`, or open the emitted `.svg` in any
+browser.
+
+## Where the icon is used
+
+- **The app.** `Pastry/Pastry.icon` is inside the folder the Xcode project
+  synchronises, and the target sets `ASSETCATALOG_COMPILER_APPICON_NAME =
+  Pastry`. There is no asset catalog, so replacing the bundle in place is all
+  the app needs — no project edit. App Store Connect takes a Mac app's icon
+  from the build, so there is no 1024 PNG to upload either.
+- **The website.** `site/assets/pastry-256.png` (favicon, header, hero) and
+  `pastry-512.png` (`og:image`). Regenerate both with `export_png.py` after any
+  change to the icon, or the site keeps serving the old one. The hero's `alt`
+  text in `site/index.html` describes the icon, so it needs updating too when
+  the design changes.
+
+The **menu-bar glyph is a different asset** and is not produced here: it is the
+`scissors` SF Symbol, set in `Pastry/MenuBarIcon.swift`, because macOS requires
+menu bar items to be flat monochrome templates. Every "scissors" in the README,
+the site and the App Store copy refers to that, not to this icon.
 
 ## How the shapes are built
 
