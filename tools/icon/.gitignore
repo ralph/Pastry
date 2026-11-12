@@ -1,5 +1,7 @@
-# intermediate render targets, regenerate with preview_icon.py / contact_sheet.py
+# intermediate render targets, regenerate with preview_icon.py /
+# contact_sheet.py / cupcake_sheet.py
 pastry-icon.svg
 sheet.svg
+*-concepts.svg
 geom.json
 __pycache__/

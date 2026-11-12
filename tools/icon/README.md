@@ -3,43 +3,48 @@
 Sources for the Pastry app bundle icon. This is **not** the menu-bar glyph
 (that is a flat monochrome SF Symbol template, a separate asset).
 
-The built bundle lives at **`Pastry/Pastry.icon`**, inside the folder the
-Xcode project synchronises, which is what gets it compiled into the app.
+The built bundle lives at **`Pastry/Pastry.icon`**, inside the folder the Xcode
+project synchronises, which is what gets it compiled into the app.
 
-Status: **design chosen, built, confirmed in Icon Composer, and shipping.**
-Angled composition, rose ground, charcoal scissors.
+Status: **three-quarter cupcake, three turns, soft rosy ground, slate case.**
+Built by `build_icon.py` from `cupcake3q.py`.
 
 ## The design
 
-A simplified side view of a layer-cake slice, taken from a reference photo of a
-pineapple-coconut slice: thick frosting cap, sponge, cream with fruit through
-it, sponge, and a cherry on top. To its left, a pair of scissors seen from the
-side — drawn in the spirit of the classic scissors glyph, but original
-geometry, not a trace of it.
+A cupcake seen from the side with the camera slightly raised — a three-quarter
+view, between a flat elevation and a pure overhead. Four things and nothing
+else: the paper case, a sliver of cake, three turns of piped frosting, and a
+cherry.
 
-Layout: scissors left, garnish right. Light ground, colourful garnish, and the
-scissors in a single flat charcoal — no coloured handles.
+Raising the camera is a geometry change, not a styling one, and it is what
+makes the thing read as a cupcake rather than a stack of shapes:
 
-The scissors are built the way real scissors are, which is what makes them read
-as scissors rather than as shears: **each arm is one continuous piece running
-from its loop, through the pivot, to the blade on the *opposite* side.** That
-crossing is what produces the pinched waist and the open wedge between the
-blades. An earlier version hinged two separate blades at a point and read as
-surgical shears.
+- the case rim becomes an **ellipse**, so the case's top edge is the *front*
+  half of that ellipse and dips lowest at the centre;
+- the pleats run from the rim to the base along lines of constant angle, which
+  **compresses them towards both edges on its own** — a vertical at angle `t`
+  projects to `cx + rx·cos(t)`, so the foreshortening is free;
+- every turn of the swirl is an ellipse rather than a flat band.
 
-Deliberately no letterforms and no use of the word "Pastry", so the app can
-still be renamed without touching the artwork.
+Proportions follow the way a real cupcake sits: **cake widest** (the muffin
+top), case rim a little narrower, swirl narrower still.
+
+Everything is a desaturated pastel with a subtle gradient. **The cherry is the
+only saturated colour in the icon**, which is what makes it read instantly at
+any size. Deliberately no letterforms and no use of the word "Pastry", so the
+app can still be renamed without touching the artwork.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `concepts.py` | The geometry. Every composition's layers as SVG path data. Single source of truth for the shapes; importable (`concepts.by_id("angled")`) or run it to dump JSON. |
-| `build_icon.py` | Builds `Pastry/Pastry.icon` from that geometry. Owns the grouping, the colours and the appearance variants. |
+| `cupcake3q.py` | The geometry and the palette. Single source of truth for the shapes; importable (`by_id("tq3")`) or run it to dump JSON. |
+| `build_icon.py` | Builds `Pastry/Pastry.icon` from that geometry. Owns the layer grouping and the ground. |
 | `preview_icon.py` | Renders the **built bundle** to a PNG contact sheet. Reads `icon.json` and the layer SVGs, so it also checks that the manifest and the artwork agree. |
-| `contact_sheet.py` | Renders all the *candidate* compositions side by side — the decision aid, kept for when the design is revisited. |
-| `concepts.png` | The candidate contact sheet, checked in so it is reviewable without running anything. |
-| `pastry-icon.png` | The chosen icon, rendered from the bundle, both appearances, 320 → 16 pt. |
+| `export_png.py` | Exports the bundle as web-ready PNGs — masked, shadowed, transparent. Refreshes `site/assets/`. |
+| `cupcake_sheet.py` | Renders a candidate *set* side by side — the decision aid, for exploring alternatives. |
+| `cupcake3q-concepts.png` | The turn-count comparison (five / four / three), checked in. |
+| `pastry-icon.png` | The shipping icon, rendered from the bundle, both appearances, 320 → 16 pt. |
 
 ## Rebuilding
 
@@ -47,162 +52,144 @@ still be renamed without touching the artwork.
 cd tools/icon
 python3 build_icon.py       # regenerates Pastry/Pastry.icon
 python3 preview_icon.py     # re-renders pastry-icon.png from the bundle
+python3 export_png.py       # refreshes site/assets/pastry-{256,512}.png
 ```
 
-Stdlib Python 3 only, except `rsvg-convert` (librsvg) for the PNG step; pass
-`--svg-only` to skip it, or open the emitted `.svg` in any browser.
+Stdlib Python 3 only, except `rsvg-convert` (librsvg) for the PNG steps; pass
+`--svg-only` to skip it in `preview_icon.py`, or open the emitted `.svg` in any
+browser.
 
-To change the design, edit `concepts.py` and re-run both. To change only
-colour, grouping or appearance variants, edit `build_icon.py` — the artwork
-does not need to be touched (see the colour convention below).
+## Where the icon is used
+
+- **The app.** `Pastry/Pastry.icon` is inside the folder the Xcode project
+  synchronises, and the target sets `ASSETCATALOG_COMPILER_APPICON_NAME =
+  Pastry`. There is no asset catalog, so replacing the bundle in place is all
+  the app needs — no project edit. App Store Connect takes a Mac app's icon
+  from the build, so there is no 1024 PNG to upload either.
+- **The website.** `site/assets/pastry-256.png` (favicon, header, hero) and
+  `pastry-512.png` (`og:image`). Regenerate both with `export_png.py` after any
+  change to the icon, or the site keeps serving the old one. The hero's `alt`
+  text in `site/index.html` describes the icon, so it needs updating too when
+  the design changes.
+
+The **menu-bar glyph is a different asset** and is not produced here: it is the
+`scissors` SF Symbol, set in `Pastry/MenuBarIcon.swift`, because macOS requires
+menu bar items to be flat monochrome templates. Every "scissors" in the README,
+the site and the App Store copy refers to that, not to this icon.
 
 ## How the shapes are built
 
 Parametric primitives rather than hand-drawn Béziers, so a shape can be
-re-proportioned by changing a number instead of dragging control points:
+re-proportioned by changing a number instead of dragging control points.
 
-- `cake(x0, x1, ytop, ybot)` — the slice. Band thicknesses are fractions of the
-  total height, so the whole slice rescales as one.
-- `scissors(pivot, deg, scale)` — built along a local +x axis with the loops at
-  −x and the blades at +x, then rotated and scaled into place by `xform`.
-  Change `deg` to re-angle the whole tool, `scale` to resize it.
-- `round_poly`, `taper`, `ring`, `circle` — the primitives those are made of.
+`swirl_turns(n)` interpolates the turns between a **fixed** bottom and top
+ellipse. That means the swirl's height and taper stay put however many turns
+there are — changing `n` only makes the banding coarser or finer, never the
+silhouette, and the cherry keeps sitting correctly on the tip. The small
+off-centre nudge that reads as a spiral **fades out towards the tip**, so the
+top turn stays centred under the cherry; a constant nudge looks like a spiral
+at five turns but merely lopsided at three.
 
-Two things in here are easy to get wrong and were both real bugs:
+Two things here are easy to get wrong and were both real bugs:
 
-- **`taper`'s end cap must use sweep-flag 0, never 1.** The cap's normal is
-  always the left normal of the travel direction, so the sweep is constant; a
-  hardcoded `1` makes the cap bite *into* the shape instead of rounding it off.
-  Invisible on thin limbs, a gaping crescent on thick ones.
-- **Render with the nonzero fill rule, not even-odd.** A scissor arm is a neck
-  and a blade that deliberately overlap; under even-odd the overlap cancels to
-  a hole. `ring()` winds its inner circle backwards, so nonzero still hollows
-  the loops correctly.
-
-`scissors()` returns its rings and its body as **separate paths** for the same
-reason: they overlap, and one combined path would cancel itself. They stay
-separate layers in the bundle.
+- **The cake is a full ellipse, not a half-dome.** A half-dome ends in two
+  sharp corners at its flat bottom, and those corners stick out past the case
+  as spurs. A full ellipse curves back under, so the overhang reads as a muffin
+  top and the rest hides behind the case. The cake also has to run down *past*
+  the lowest point of the case's front rim, or a gap opens between them.
+- **Render with the nonzero fill rule, not even-odd.** Shapes here overlap on
+  purpose; under even-odd an overlap cancels to a hole.
 
 ## The bundle
 
 ```
 Pastry/Pastry.icon/
-  icon.json          ground fill, groups, layers, and all colour
-  Assets/*.svg       one full-canvas 1024x1024 white silhouette per layer
+  icon.json          the ground fill and the layer grouping
+  Assets/*.svg       one full-canvas 1024x1024 layer, carrying its own gradient
 ```
 
-**Colour convention: the SVGs are pure geometry filled white, and every colour
-lives in `icon.json`.** A layer's `fill` in the manifest overrides the fill in
-its SVG — verified against a shipped Icon Composer bundle whose `bolt.svg` is
-`fill="#FFFFFF"` in markup yet renders gold. Keeping colour in one file means a
-palette change never touches the artwork, and a layer that renders white in
-Icon Composer is a loud, obvious signal that its fill failed to apply.
+**Colour convention: each layer SVG carries its own gradient, and `icon.json`
+sets no layer fills.** This is the *opposite* of the previous flat-colour icon,
+where all colour lived in the manifest. The reason is that every shape in this
+design needs a gradient:
+
+- a manifest `fill` can only be a solid, or the top-level ground gradient; a
+  per-layer gradient there is not something any `.icon` bundle on this machine
+  uses, so it is unverified;
+- an SVG gradient *is* verified to be renderable — CoreSVG, the framework Icon
+  Composer bundles to draw these layers, carries full support for
+  `linearGradient`, `stop-color`, `gradientUnits` and `objectBoundingBox`;
+- nothing in the cupcake changes between appearances, so no layer needs an
+  appearance variant anyway. Only the ground gets a `dark` specialization.
+
+If a layer ever turns up flat or black in Icon Composer, that is the signal
+this assumption broke. The fallback is to flatten that layer to a solid
+manifest fill, or export it as a PNG.
 
 Groups are listed **front to back**, and so are the layers inside them. Icon
-Composer allows 1–4 layers per group, which is why the slice is split across
-two groups rather than one:
+Composer allows 1–4 layers per group:
 
 | Group | Layers |
 |---|---|
-| Scissors | `scissors-rings`, `scissors-body` |
-| Garnish | `cherry`, `cherry-stem`, `pineapple` |
-| Topping | `fruit-bits`, `frosting` |
-| Sponge | `cream`, `sponge-top`, `sponge-bottom` |
+| Cherry | `cherry-shine`, `cherry`, `cherry-stem` |
+| Frosting | `swirl-0`, `swirl-1`, `swirl-2` |
+| Case | `pleats`, `case` |
+| Cake | `cake` |
 
 ## Palette
 
-**Only the scissors change between appearances.** Everything edible keeps one
-palette in both, which is what the HIG asks for (keep the icon's features
-consistent across appearances) and keeps `icon.json` down to a single `dark`
-specialization on the scissors plus one on the ground.
+| Role | Colour |
+|---|---|
+| Ground, default | `#FFF3EF` → `#FFC8D2` |
+| Ground, dark | `#5E323B` → `#2B151A` |
+| Case | `#CBD9E0` → `#9FB4C0` |
+| Pleats | `#B9CAD3` → `#8EA5B2` |
+| Cake | `#EFDFC2` → `#D3B88F` |
+| Cream | `#FFFCF6` → `#E4D3C0` |
+| Cherry | `#F2566B` → `#C8102E` |
+| Stem | `#A8906F` → `#7E674B` |
 
-| Role | Default | Dark |
-|---|---|---|
-| Ground (gradient) | `#FFF0EB` → `#FFC6CE` | `#5C3039` → `#2A1419` |
-| Frosting | `#FFFFFF` | same |
-| Sponge | `#F9D89B` | same |
-| Cream | `#FFF6E6` | same |
-| Pineapple | `#FFC42B` | same |
-| Cherry | `#E8384C` | same |
-| Stem | `#4E7F3C` | same |
-| Scissors | `#332E3B` | `#A7AFC4` |
+Four more case colours are drawn up in `cupcake3q.py` (`CASES`: sage, lilac,
+sand, rose) if slate is ever reconsidered.
 
-The dark-appearance scissors are deliberately mid-slate rather than near-white:
-they have to read against the dark ground *and* against the white frosting they
-cross. Near-white blades vanish on the frosting, and black vanishes into the
-ground. That squeeze is why the default and dark tones are so far apart while
-nothing else in the icon changes at all.
-
-Three other grounds are drawn up in `concepts.py` (`COLORWAYS`: vanilla, mint,
-sky) if the rose is ever reconsidered — change `GROUND` in `build_icon.py`.
-
-## Constraints the artwork is drawn to
-
-Verified against Apple's Human Interface Guidelines and three real `.icon`
-bundles on this machine (Xcode 27.2):
-
-- macOS layout is square, **1024×1024 px**, layered. Each layer SVG is the
-  full canvas; layers register by absolute coordinates.
-- The system supplies the rounded-rectangle mask, Liquid Glass material,
-  specular highlights, refraction and shadow. Layers therefore contain **no**
-  container shape, bevel, drop shadow, inner glow or background gradient —
-  pre-masked layers degrade the system's specular highlights.
-- Layers are **flat and opaque**; transparency is set per group in `icon.json`
-  (`translucency`), not painted into the art.
-- No feathered edges, hairline strokes or sharp corners — they disintegrate at
-  small sizes.
-- Six appearances exist (default, dark, clear light/dark, tinted light/dark).
-  Only **default and dark** are authored; macOS generates the rest.
+**Nothing changes between appearances except the ground.** Every shape is pale
+enough to read on both, which keeps the icon's features identical across all
+six appearances — what the guidelines ask for — and keeps the manifest about as
+simple as it can be.
 
 ## What is verified
 
-- `icon.json` is valid JSON; every `image-name` resolves to a file, with no
-  orphan assets, and no group exceeds the four-layer limit.
+- `icon.json` is valid JSON; every `image-name` resolves with no orphan assets;
+  no group exceeds the four-layer limit; the ground carries both appearances.
 - Every layer SVG parses as XML and is a full `0 0 1024 1024` canvas.
 - The bundle composites correctly **from its own files** — `preview_icon.py`
   reads the manifest and the SVGs, not the generator.
 - macOS identifies it as `com.apple.iconcomposer.icon`
-  (`mdls -name kMDItemContentType Pastry/Pastry.icon`), the same content
-  type as a GUI-authored bundle.
-- **It opens in Icon Composer and renders correctly** — all four groups and
-  ten layers appear with the right names and nesting, every fill applies, and
-  the Liquid Glass render looks right.
-- **It round-trips through the GUI byte-identically.** Saving from Icon
-  Composer and re-running `build_icon.py` produce the same file. This is why
-  `build_icon.py` writes Icon Composer's exact JSON style (two-space indent,
-  sorted keys, a space either side of the colon, no trailing newline) and
-  omits the gradient `orientation` — Icon Composer strips an explicit
-  top-to-bottom orientation because that is already the default.
-
-The one thing a GUI save adds that the generator does not is `"hidden": false`
-on a layer whose visibility was toggled. It is a redundant default and
-regenerating drops it again; harmless either way.
+  (`mdls -name kMDItemContentType Pastry/Pastry.icon`), the same content type
+  as a GUI-authored bundle.
+- `build_icon.py` writes Icon Composer's exact JSON style (two-space indent,
+  sorted keys, a space either side of the colon, no trailing newline), so
+  saving from the GUI and regenerating from source produce the same file.
 
 ## Still worth a human eye
 
-The `glass` flags and the `translucency` values (0.12 on Topping and Sponge,
-off elsewhere) are a conservative first pass chosen to be predictable, not
-tuned. So are the specular settings. If they want adjusting, change them in
-`build_icon.py` rather than the GUI, or change them in the GUI and port the
-numbers back — otherwise the next `build_icon.py` run overwrites them.
-
-The system-generated **clear** and **tinted** appearances have not been looked
-at closely. The thing to check is that the scissors survive, since they are the
-only element carrying a dark specialization.
+- **That the SVG gradients render in Icon Composer.** CoreSVG supports them and
+  the bundle previews correctly here, but it has not been opened in the GUI
+  since the design changed. This is the one new assumption.
+- The `glass` flags and the `translucency` values (0.1 on Frosting and Case,
+  off elsewhere) are a conservative first pass chosen to be predictable, not
+  tuned. Change them in `build_icon.py` rather than the GUI, or change them in
+  the GUI and port the numbers back — otherwise the next build overwrites them.
+- The system-generated **clear** and **tinted** appearances.
 
 Icon Composer is GUI-only — it ships inside Xcode at
 `Xcode.app/Contents/Applications/Icon Composer.app` and there is no
 command-line equivalent (`xcrun --find icon-composer` fails). It is not needed
 to build or ship the app; Xcode compiles the bundle as it is.
 
-## Note on location
+## History
 
-This folder lives in `tools/` because it is tooling: it *builds* an input to
-the app rather than documenting one. The bundle it writes, `Pastry/Pastry.icon`,
-has to sit inside the folder the Xcode project synchronises, which is what
-gets actool to compile it into the app.
-
-It used to live in `Resources/` beside the legacy Flycut artwork. That whole
-folder was deleted in feature 10; this moved out first, because without the
-generator and these vector sources the icon bundle would be a binary nobody
-could regenerate.
+The icon before this one was a slice of layer cake with a pair of scissors,
+which read as too busy: two objects, a diagonal axis, and a lot going on. Its
+generator (`concepts.py`) and the intermediate straight-on cupcake candidates
+(`cupcake.py`) were removed when this design landed; both are in git history.
