@@ -100,9 +100,13 @@ jobs:
 
   deploy:
     needs: check
-    # A pull request checks the links and stops there; it has no business
-    # publishing anything.
-    if: github.event_name != 'pull_request'
+    # Only the default branch publishes. A pull request has no business
+    # doing it, and neither has a dispatch from a feature branch — the
+    # github-pages environment refuses anything but the default branch, so
+    # without this the run goes red for a reason that is nobody's fault.
+    # Checking the links from a branch stays useful, which is why this sits
+    # on the deploy job rather than on the workflow.
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     permissions:
       contents: read
