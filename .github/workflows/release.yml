@@ -106,13 +106,7 @@ jobs:
             args+=(CODE_SIGN_IDENTITY="Developer ID Application"
                    CODE_SIGN_STYLE=Manual
                    DEVELOPMENT_TEAM="$TEAM_ID"
-                   OTHER_CODE_SIGN_FLAGS=--timestamp
-                   # Without this Xcode injects com.apple.security.
-                   # get-task-allow — the "allow debugging" entitlement —
-                   # and Apple rejects the submission for it. archive plus
-                   # exportArchive strips it when exporting; a direct build
-                   # does not, so it has to be turned off here.
-                   CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO)
+                   OTHER_CODE_SIGN_FLAGS=--timestamp)
           else
             args+=(CODE_SIGNING_ALLOWED=NO)
           fi
@@ -144,7 +138,8 @@ jobs:
           if codesign -d --entitlements - --xml "$app" 2>/dev/null \
                | grep -q 'get-task-allow'; then
             echo "::error::The executable requests com.apple.security.get-task-allow."
-            echo "::error::Apple rejects that. CODE_SIGN_INJECT_BASE_ENTITLEMENTS must be NO."
+            echo "::error::Apple rejects that. The project's Release configuration"
+            echo "::error::must set CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO."
             exit 1
           fi
 
@@ -311,9 +306,13 @@ jobs:
   # absent, so the path can be exercised before any of it is set up.
   app-store:
     # After the Developer ID build, not alongside it. There is no point
-    # shipping to the store a build whose own release failed, and running
-    # them in sequence keeps the two signing keychains out of each other's
-    # way. It also means the tests have already run.
+    # shipping to the store a build whose own release failed, and an upload
+    # burns a build number whether or not Apple accepts it. It is also the
+    # only gate on the tests, since ci.yml does not run on tags. The two
+    # keychains need no help staying apart — separate jobs, separate VMs —
+    # so that is not a reason for this, whatever it looks like.
+    #
+    # It carries the version too, which is why that is worked out once.
     needs: release
     # Bump with the other two, in this file and in ci.yml.
     runs-on: macos-26
@@ -400,7 +399,6 @@ jobs:
           dir="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$dir"
           file="$dir/pastry-app-store.provisionprofile"
-          echo "profile=$file" >> "$GITHUB_OUTPUT"
           printf '%s' "$PROFILE" | base64 --decode > "$file"
           # A profile is CMS-signed, so its contents come out through
           # `security cms` rather than plutil.
@@ -408,7 +406,7 @@ jobs:
           if ! security cms -D -i "$file" > "$plist" 2>/dev/null; then
             echo "::error::APPSTORE_PROVISIONING_PROFILE is not a provisioning profile."
             echo "::error::It is usually a truncated paste. Set it from the file:"
-            echo "::error::  base64 -i Pastry.provisionprofile | gh secret set APPSTORE_PROVISIONING_PROFILE --repo ralph/Pastry"
+            echo "::error::  base64 -i Pastry.provisionprofile | gh secret set APPSTORE_PROVISIONING_PROFILE --repo ${GITHUB_REPOSITORY}"
             exit 1
           fi
           name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$plist")"
@@ -438,13 +436,12 @@ jobs:
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             OTHER_CODE_SIGN_FLAGS=--timestamp \
-            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
             CODE_SIGN_ENTITLEMENTS=Pastry/Pastry-AppStore.entitlements
 
-      # The sandbox is applied from the command line rather than from the
-      # project, precisely so it never reaches the DMG build. That makes it
-      # exactly the kind of setting that can silently stop applying, and the
-      # store's rejection for it arrives long after the upload.
+      # Five seconds here beats a rejection from Apple, same as the DMG
+      # job's check — but it matters more, because the next step may hand
+      # this to App Store Connect, which burns the build number whether or
+      # not Apple likes what it gets.
       - name: Check the archive before exporting it
         if: steps.store.outputs.ready == 'true'
         run: |
@@ -460,7 +457,8 @@ jobs:
           fi
           if printf '%s' "$entitlements" | grep -q 'get-task-allow'; then
             echo "::error::The executable requests com.apple.security.get-task-allow."
-            echo "::error::Apple rejects that. CODE_SIGN_INJECT_BASE_ENTITLEMENTS must be NO."
+            echo "::error::Apple rejects that. The project's Release configuration"
+            echo "::error::must set CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO."
             exit 1
           fi
           test -f "$app/Contents/embedded.provisionprofile" || {
@@ -486,16 +484,13 @@ jobs:
           # manual run exercises the whole path — archive, sandbox,
           # installer, export — without putting a build nobody asked for in
           # front of App Store Connect.
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            destination="upload"
-          else
-            destination="export"
+          destination="export"
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
             echo "::notice::Not a tag; building the package without uploading it."
-          fi
-          if [ "$destination" = "upload" ] \
-             && { [ -z "${KEY}" ] || [ -z "${KEY_ID}" ] || [ -z "${ISSUER_ID}" ]; }; then
-            destination="export"
+          elif [ -z "${KEY}" ] || [ -z "${KEY_ID}" ] || [ -z "${ISSUER_ID}" ]; then
             echo "::warning::The App Store Connect API key secrets are incomplete; exporting without uploading."
+          else
+            destination="upload"
           fi
           plist="$RUNNER_TEMP/export.plist"
           # The certificate names come from the keychain rather than being
@@ -557,9 +552,12 @@ jobs:
           path: ${{ steps.export.outputs.pkg }}
           if-no-files-found: error
 
+      # Unconditional: rm -f on a profile that was never written is a
+      # no-op, and that is cheaper than an output threading a constant
+      # path across forty lines to drive an `if`.
       - name: Remove the provisioning profile
-        if: always() && steps.store.outputs.profile != ''
-        run: rm -f "${{ steps.store.outputs.profile }}"
+        if: always()
+        run: rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/pastry-app-store.provisionprofile"
 
       - name: Remove the signing keychain
         if: always() && steps.keychain.outputs.keychain != ''

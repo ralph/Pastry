@@ -26,10 +26,6 @@ inputs:
     description: Name of the secret holding `certificates`, used in error messages.
     required: false
     default: CERTIFICATES_P12
-  repository:
-    description: Repository to name in the `gh secret set` remediation hint.
-    required: false
-    default: ralph/Pastry
 
 outputs:
   imported:
@@ -48,7 +44,6 @@ runs:
         CERTIFICATE: ${{ inputs.certificates }}
         CERTIFICATE_PASSWORD: ${{ inputs.password }}
         SECRET_NAME: ${{ inputs.secret-name }}
-        REPOSITORY: ${{ inputs.repository }}
       run: |
         set -euo pipefail
         if [ -z "${CERTIFICATE}" ]; then
@@ -76,7 +71,7 @@ runs:
         if ! openssl asn1parse -inform DER -in "$p12" >/dev/null 2>&1; then
           echo "::error::${SECRET_NAME} did not decode to a valid PKCS#12."
           echo "::error::It is usually a truncated paste. Set it from the file instead:"
-          echo "::error::  base64 -i YourCert.p12 | gh secret set ${SECRET_NAME} --repo ${REPOSITORY}"
+          echo "::error::  base64 -i YourCert.p12 | gh secret set ${SECRET_NAME} --repo ${GITHUB_REPOSITORY}"
           exit 1
         fi
         # productbuild and productsign matter only to the App Store path,

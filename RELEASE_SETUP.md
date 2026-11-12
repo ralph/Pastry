@@ -5,12 +5,8 @@ is pushed. It runs the tests, builds the app, signs it, packages a DMG,
 notarizes and staples **the DMG**, and opens a **draft** GitHub release with it
 attached — draft so you see it before anyone else does.
 
-A second job then builds the same version again for the **Mac App Store** —
-sandboxed, signed with a distribution certificate, wrapped in an installer
-package and uploaded to App Store Connect. It runs after the first one and
-cannot affect it. [Shipping to the Mac App Store](#shipping-to-the-mac-app-store)
-below covers what it needs; until those secrets exist it warns and does
-nothing.
+A second job then builds the same version again for the Mac App Store —
+[Shipping to the Mac App Store](#shipping-to-the-mac-app-store) covers it.
 
 The release notes come from the matching section of `CHANGELOG.md`, so write
 that before tagging. A version with no section gets a bare title and a warning
@@ -254,6 +250,15 @@ timestamp comes from the workflow (`OTHER_CODE_SIGN_FLAGS=--timestamp`); the
 hardened runtime is a project setting (`ENABLE_HARDENED_RUNTIME`), so that one
 means the build settings changed. The workflow checks both before submitting,
 so in practice it fails in seconds rather than after Apple's round trip.
+
+**`The executable requests com.apple.security.get-task-allow`.** Xcode adds
+that entitlement — the one that permits debugging — unless told not to, and
+Apple refuses any build carrying it. `CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO`
+in the project's **Release** configuration is what turns it off; Debug is left
+alone so local debugging still works. Both release paths check for it, because
+`xcodebuild archive` plus `exportArchive` happens to strip it on the way out
+while a plain `xcodebuild build` does not — so the DMG path would be the one to
+break, and it would break silently until Apple said no.
 
 **The release is built unsigned.** `CERTIFICATES_P12` is missing or empty. The
 workflow says so in its summary rather than failing, by design.

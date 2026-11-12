@@ -101,9 +101,11 @@ only for build settings.
 ## Releasing
 
 Push a `v*` tag. `.github/workflows/release.yml` builds, signs, notarizes and
-staples a DMG, and opens a draft release with it attached. See
-[RELEASE_SETUP.md](RELEASE_SETUP.md) for the secrets it needs; without them it
-still builds, unsigned, so the workflow can be tried first.
+staples a DMG, opens a draft release with it attached, and then builds the same
+version again — sandboxed, for the Mac App Store — and uploads it to App Store
+Connect. See [RELEASE_SETUP.md](RELEASE_SETUP.md) for the secrets each half
+needs; without them it still builds, unsigned, so the workflow can be tried
+first.
 
 ## How it is put together
 
