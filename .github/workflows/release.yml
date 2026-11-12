@@ -370,16 +370,30 @@ jobs:
             echo "::error::Mac App Distribution certificate, not the Developer ID one."
             exit 1
           fi
-          # Checked separately because its absence fails much later, inside
-          # exportArchive, with a message about productbuild that does not
-          # mention the missing certificate.
-          if ! security find-identity -v "$KEYCHAIN" | grep -q 'Mac Developer Installer'; then
+          # Read out rather than assumed, for the same reason, and checked
+          # here rather than left to exportArchive — which only complains
+          # at the end of a ten-minute build, about productbuild, without
+          # mentioning the missing certificate.
+          installer="$(security find-identity -v "$KEYCHAIN" \
+            | grep -oE '"[^"]*(Mac Developer Installer|Mac Installer Distribution)[^"]*"' \
+            | head -1 | tr -d '"' || true)"
+          if [ -z "$installer" ]; then
             echo "::error::No 3rd Party Mac Developer Installer identity. The store"
             echo "::error::takes a signed installer package, so the .p12 has to hold"
             echo "::error::both certificates."
             exit 1
           fi
-          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+          # exportArchive matches on the certificate's own name, so the
+          # two *-cert values are the identities with the holder and team
+          # cut off. Xcode's "Mac App Distribution" and "Mac Installer
+          # Distribution" selectors look like the obvious thing to write
+          # instead, and they resolve to nothing against a 3rd Party Mac
+          # Developer certificate — which fails the export, after the build.
+          {
+            echo "identity=$identity"
+            echo "app-cert=${identity%%:*}"
+            echo "installer-cert=${installer%%:*}"
+          } >> "$GITHUB_OUTPUT"
           # Xcode finds a profile by searching this directory, so the file
           # name means nothing to it — a fixed one just stops a re-run on a
           # self-hosted runner from piling up copies.
@@ -461,6 +475,8 @@ jobs:
           VERSION: ${{ needs.release.outputs.version }}
           TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
           PROFILE_NAME: ${{ steps.store.outputs.profile-name }}
+          APP_CERT: ${{ steps.store.outputs.app-cert }}
+          INSTALLER_CERT: ${{ steps.store.outputs.installer-cert }}
           KEY: ${{ secrets.NOTARY_KEY }}
           KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
@@ -482,9 +498,9 @@ jobs:
             echo "::warning::The App Store Connect API key secrets are incomplete; exporting without uploading."
           fi
           plist="$RUNNER_TEMP/export.plist"
-          # The two certificate values are Xcode's automatic selectors
-          # rather than certificate names, so whichever of the two valid
-          # application certificates is installed gets picked.
+          # The certificate names come from the keychain rather than being
+          # written here, so whichever of the valid distribution
+          # certificates was created is the one used.
           cat > "$plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -494,8 +510,8 @@ jobs:
             <key>destination</key><string>$destination</string>
             <key>teamID</key><string>$TEAM_ID</string>
             <key>signingStyle</key><string>manual</string>
-            <key>signingCertificate</key><string>Mac App Distribution</string>
-            <key>installerSigningCertificate</key><string>Mac Installer Distribution</string>
+            <key>signingCertificate</key><string>$APP_CERT</string>
+            <key>installerSigningCertificate</key><string>$INSTALLER_CERT</string>
             <key>provisioningProfiles</key>
             <dict>
               <key>de.rvdh.Pastry</key><string>$PROFILE_NAME</string>

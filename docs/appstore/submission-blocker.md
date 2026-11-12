@@ -84,9 +84,11 @@ code, so the risk is a good deal smaller than it first looked.
    `app-store` job in `.github/workflows/release.yml`. It archives with the
    sandbox entitlements, signs with a distribution identity and an embedded
    provisioning profile, and hands the installer package to App Store Connect.
-   It needs three secrets and two certificates that do not exist yet;
-   `RELEASE_SETUP.md` says how to make them. Until they do, the job warns and
-   does nothing, so nothing about the DMG release changes.
+   The certificates and the profile now exist (`RELEASE_SETUP.md` lists them),
+   and the whole path has been run by hand against them: the archive is
+   sandboxed and carries the profile, and `exportArchive` produces a universal
+   installer package signed by the installer certificate. Only the upload
+   itself is untried. What remains is setting the three repository secrets.
 5. ~~Create the app record and attach the metadata~~ — done, app `6833662343`,
    with four screenshots. See `metadata.md`.
 6. Add the review contact details (a phone number this repository should not
