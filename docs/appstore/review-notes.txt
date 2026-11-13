@@ -1,11 +1,51 @@
-Pastry is a clipboard manager. It needs macOS Accessibility permission to
-paste into the frontmost application on the user's behalf, which it requests
-the first time the user chooses a clipping. Without the permission the app
-still works: the chosen clipping goes onto the system clipboard and the user
-pastes it themselves.
+WHERE THE APP IS AFTER YOU LAUNCH IT
 
-To test: copy two or three different pieces of text, then hold Shift-Command-V
-and tap V to step back through them. Release the modifiers to paste. The
-scissors icon in the menu bar shows the same history with a search field.
+Pastry has no window and no Dock icon. It is a menu-bar app: the only thing
+that appears when you launch it is a small scissors icon at the right-hand
+end of the macOS menu bar. Nothing opens, nothing lands in the Dock, and it
+does not appear in Command-Tab. If launching the app looks like it did
+nothing, this is why.
 
-There is no account, no network access and nothing to sign in to.
+The App Store icon is a cupcake and the menu-bar icon is a pair of scissors.
+That difference is deliberate: a menu-bar icon has to be a flat monochrome
+template image, so it cannot be the app icon.
+
+WHAT IT DOES
+
+Pastry remembers the text you copy, so you can paste something you copied
+earlier without going back to find it again.
+
+HOW TO TEST IT, IN ABOUT A MINUTE
+
+1. Launch Pastry. Look for the scissors icon in the menu bar.
+2. In any application -- TextEdit is fine -- copy two or three different
+   pieces of text with Command-C.
+3. Click the scissors icon. The menu lists what you copied, newest first,
+   with a search field at the top that filters as you type.
+4. Choose one. It is pasted into the application you were last typing in.
+5. Or, without the menu: hold Shift-Command-V down and tap V repeatedly. A
+   panel appears in the middle of the screen showing one clipping at a time,
+   walking back through the history. Release the modifier keys and the
+   clipping you stopped on is pasted.
+
+PERMISSIONS
+
+The first time you choose a clipping, macOS asks for Accessibility
+permission. Pastry needs it to paste into the frontmost application on your
+behalf, and that is the only thing it uses it for.
+
+Declining is not a dead end. The chosen clipping still goes onto the system
+clipboard; you press Command-V yourself.
+
+NO ACCOUNT, NO NETWORK, NO EXTERNAL SERVICES
+
+There is nothing to sign in to and no demo account to ask for. Pastry has no
+accounts, no network code of any kind, no analytics, no sync and no server.
+It uses no third-party services, SDKs or data providers. Nothing it stores
+leaves the Mac.
+
+Clippings an application marks as concealed -- password fields, mostly -- are
+skipped and never stored.
+
+The app behaves identically in every region. It is English-only and has no
+regional content, pricing or feature differences.
