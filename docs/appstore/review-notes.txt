@@ -13,7 +13,11 @@ template image, so it cannot be the app icon.
 WHAT IT DOES
 
 Pastry remembers the text you copy, so you can paste something you copied
-earlier without going back to find it again.
+earlier without going back to find it again. macOS keeps only the most recent
+clipboard item, so anything you copy replaces what was there.
+
+It is for people who copy and paste all day: developers, writers, support
+staff, anyone moving text between applications.
 
 HOW TO TEST IT, IN ABOUT A MINUTE
 
@@ -27,6 +31,10 @@ HOW TO TEST IT, IN ABOUT A MINUTE
    panel appears in the middle of the screen showing one clipping at a time,
    walking back through the history. Release the modifier keys and the
    clipping you stopped on is pasted.
+
+Settings, reachable from the same menu, let you change the keyboard shortcut,
+how many clippings are kept, how many are shown, and whether the app starts at
+login. About Pastry and Quit Pastry are in the same menu.
 
 PERMISSIONS
 
@@ -49,3 +57,10 @@ skipped and never stored.
 
 The app behaves identically in every region. It is English-only and has no
 regional content, pricing or feature differences.
+
+NOT A REGULATED INDUSTRY, NO THIRD-PARTY MATERIAL
+
+Pastry is a clipboard utility. It operates in no regulated industry and needs
+no permits or authorisations. It contains no third-party or protected
+material: the code, the icon and the copy are all our own work, published
+under the MIT licence at https://github.com/ralph/Pastry
