@@ -10,8 +10,9 @@ submission.
 | --- | --- |
 | App ID | `6833662343` |
 | Bundle ID record | `TVTSP57476` (`de.rvdh.Pastry`, team `89S4HZY343`) |
-| State | `WAITING_FOR_REVIEW` since 2026-11-12 |
-| Review submission | `ffeaf8c8-db9e-419d-8dc5-e170654ed04c` |
+| State | `WAITING_FOR_REVIEW` since 2026-11-19 |
+| Review submission | `e8374a51-5697-4e24-be56-bd630ecb04cf` |
+| Previous submission | `ffeaf8c8-db9e-419d-8dc5-e170654ed04c`, rejected 2026-11-13 under Guideline 2.1, cancelled 2026-11-19 |
 
 ---
 
@@ -237,12 +238,14 @@ doctor` says so rather than checking it:
 asc web apps declarations list --app 6833662343
 ```
 
-Two exist on this app, and neither is marked `required`:
+That command sees two on this app, and neither is marked `required`:
 
 | Requirement | What it is | State |
 | --- | --- | --- |
 | `DAC7` | EU tax reporting for sellers | `COLLECTED` |
 | `MEDICAL_DEVICE` | whether the app is a regulated medical device | `COLLECTED`, declared false, for EEA, GBR and USA |
+
+It does not see all of them. See the section below.
 
 `MEDICAL_DEVICE` sat at `PENDING_COLLECTION` until it was answered an hour
 before submission. Nothing said it would block, and it may well not have. But
@@ -252,6 +255,73 @@ that is declared and never published, and that one does block:
 ```bash
 asc web apps medical-device set --app 6833662343 --declared false
 ```
+
+## The declarations `asc` cannot see at all
+
+On 19 November 2026 the resubmission of 0.1.1 was refused like this:
+
+```
+appStoreVersions with id '4b36da2c-...' is not in valid state.
+Associated errors for /v1/appInfos/00bccea0-...:
+  - Cannot submit version due to unfulfilled compliance requirement.
+  - Cannot submit version due to unfulfilled compliance requirement.
+```
+
+Every check available from the command line said the app was clean:
+`asc validate` reported zero blocking errors, App Privacy was published,
+content rights were declared, the age rating had no missing responses, both
+program agreements were active, and `asc web apps declarations list` reported
+`DAC7` and `MEDICAL_DEVICE`, both `COLLECTED`. Re-running
+`asc web apps medical-device set` answered `Changed: false` — there was
+nothing to re-sign. Apple's 409 carries no requirement name, and `--api-debug`
+adds nothing to it.
+
+The answer was only on the website, under App Information -> App Store
+Regulations and Permits, which had grown two rows that day:
+
+| Requirement | Countries or regions | Updated |
+| --- | --- | --- |
+| Security assessment | China, mainland | 19 Nov 2026 |
+| AI-generated or synthetic content | China, mainland | 19 Nov 2026 |
+
+Two rows, two identical errors. The app is available in all 175 territories,
+mainland China among them, so both applied. Answering them on the website
+cleared the submission.
+
+Two things worth keeping from this:
+
+- `asc web apps declarations list` is not a complete list of the compliance
+  requirements that can block a submission. It reported two rows while four
+  existed. When a submission fails on `unfulfilled compliance requirement` and
+  everything readable looks clean, the website is the only source of truth.
+- The requirements appeared the same day, with no change on our side. The
+  12 November submission went through because they did not exist yet. A
+  submission that worked last week is not evidence that the account is in a
+  submittable state today.
+
+## Cancelling a rejected submission before resubmitting
+
+With the compliance errors cleared, the resubmission failed again:
+
+```
+conflict review submission ffeaf8c8-... could not be safely reused:
+review submission ffeaf8c8-... is in state "UNRESOLVED_ISSUES", not "READY_FOR_REVIEW"
+```
+
+A rejected version stays attached to the submission it was rejected on, and
+that submission is not editable. It has to be cancelled before the version can
+join a new one:
+
+```bash
+asc submit cancel --id ffeaf8c8-db9e-419d-8dc5-e170654ed04c --confirm
+asc review submit --app 6833662343 --version 0.1.1 --platform MAC_OS --latest --confirm
+```
+
+Cancelling costs less than it sounds like. The demo video stays, because it is
+attached to the review detail rather than to the submission; so do the review
+notes, the build, and the rejection in the version history. What ends is the
+Resolution Center thread for that submission — a reviewer can no longer pick
+up the reply and answer it.
 
 ## Review notes
 
